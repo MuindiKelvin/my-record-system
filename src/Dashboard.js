@@ -248,6 +248,18 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        <div className="col-md-6 col-lg">
+          <div className="card h-100 shadow-sm">
+            <div className="card-body d-flex align-items-center">
+              <AlertCircle size={32} className="text-danger me-3" />
+              <div>
+                <h6 className="card-subtitle mb-1 text-muted">Cancelled</h6>
+                <h2 className="card-title mb-0">{stats.cancelled}</h2>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Project Status Trends */}
