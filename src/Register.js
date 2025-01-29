@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from './firebase';
+import logo from './logo/logo.png';
 
 function Register() {
   const [email, setEmail] = useState('');
@@ -23,30 +24,47 @@ function Register() {
       return;
     }
 
-    setError(''); // Clear any previous errors
+    setError('');
 
     createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
-        // Successfully registered
         console.log('User registered:', userCredential.user);
-        navigate('/login'); // Navigate to login page
+        navigate('/login');
       })
       .catch((err) => {
-        // Handle registration errors
         console.error('Registration error:', err.message);
-        setError(err.message); // Set error message to display
+        setError(err.message);
       });
   };
 
   return (
-    <div className="container mt-5">
-      <div className="row justify-content-center">
-        <div className="col-md-4">
-          <div className="card">
-            <div className="card-body">
-              <h3 className="text-center">Register</h3>
+    <div className="container">
+      <div className="row justify-content-center align-items-center min-vh-100">
+        <div className="col-md-6">
+          <div className="card shadow">
+            <div className="card-body p-5">
+              <div className="text-center mb-4">
+                <div 
+                  className="mx-auto mb-4" 
+                  style={{
+                    width: '100px',
+                    height: '100px',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    border: '4px solid #007bff'
+                  }}
+                >
+                  <img
+                    src={logo}
+                    alt="Logo"
+                    className="w-100 h-100"
+                    style={{ objectFit: 'cover' }}
+                  />
+                </div>
+                <h2 className="font-weight-bold">Register</h2>
+              </div>
               <form onSubmit={handleRegister}>
-                <div className="mb-3">
+                <div className="form-group mb-3">
                   <label htmlFor="email" className="form-label">
                     Email Address
                   </label>
@@ -59,7 +77,7 @@ function Register() {
                     required
                   />
                 </div>
-                <div className="mb-3">
+                <div className="form-group mb-3">
                   <label htmlFor="password" className="form-label">
                     Password
                   </label>
@@ -72,7 +90,7 @@ function Register() {
                     required
                   />
                 </div>
-                <div className="mb-3">
+                <div className="form-group mb-3">
                   <label htmlFor="confirmPassword" className="form-label">
                     Confirm Password
                   </label>
@@ -85,17 +103,23 @@ function Register() {
                     required
                   />
                 </div>
-                {error && <div className="alert alert-danger">{error}</div>}
-                <button type="submit" className="btn btn-primary w-100">
+                {error && (
+                  <div className="alert alert-danger text-center" role="alert">
+                    {error}
+                  </div>
+                )}
+                <button type="submit" className="btn btn-primary w-100 mb-3">
                   Register
                 </button>
               </form>
-              <p className="text-center mt-3">
-                Already have an account?{' '}
-                <a href="/login" className="text-decoration-none">
-                  Login
-                </a>
-              </p>
+              <div className="text-center">
+                <p className="mb-0">
+                  Already have an account?{' '}
+                  <a href="/login" className="text-primary">
+                    Login
+                  </a>
+                </p>
+              </div>
             </div>
           </div>
         </div>

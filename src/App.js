@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // <-- Added useNavigate
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import Login from './Login';
@@ -7,6 +7,7 @@ import Register from './Register';
 import Dashboard from './Dashboard';
 import ProjectList from './ProjectList';
 import ProjectForm from './ProjectForm';
+import logo from './logo/logo.png'; // Adjust the path based on your logo file name
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
@@ -41,14 +42,23 @@ const PrivateLayout = ({ children }) => {
   return (
     <div className="d-flex">
       <Sidebar user={user} />
-      <main className="flex-grow-1 p-3 min-vh-100 bg-light">
-        {children}
-      </main>
+      <div className="flex-grow-1 d-flex flex-column min-vh-100">
+        <main className="flex-grow-1 p-3 bg-light">
+          {children}
+        </main>
+        <footer className="py-3 bg-light border-top">
+          <div className="container-fluid text-center">
+            <small className="text-muted">
+              © {new Date().getFullYear()} Kelvin Muindi. All rights reserved.
+            </small>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 };
 
-// Updated Sidebar component to work without AuthContext
+// Updated Sidebar component with logo
 const Sidebar = ({ user }) => {
   const navigate = useNavigate();
 
@@ -64,17 +74,30 @@ const Sidebar = ({ user }) => {
   return (
     <div className="bg-dark text-white" style={{ width: '250px', minHeight: '100vh' }}>
       <div className="d-flex flex-column h-100">
-        {/* Header */}
-        <div className="p-3 border-bottom border-secondary">
-          <h5 className="mb-0">Project Manager</h5>
-          <small className="text-muted">{user?.email}</small>
+        {/* Logo and Header */}
+        <div className="p-3 text-center border-bottom border-secondary">
+          <div className="mb-3">
+            <img
+              src={logo}
+              alt="Company Logo"
+              className="rounded-circle"
+              style={{
+                width: '80px',
+                height: '80px',
+                objectFit: 'cover',
+                border: '2px solid #fff'
+              }}
+            />
+          </div>
+          <h5 className="mb-1">Kelvin Muindi</h5>
+          <small className="text-muted d-block">{user?.email}</small>
         </div>
 
         {/* Navigation Links */}
         <nav className="nav flex-column py-3">
           <a 
             href="/dashboard" 
-            className="nav-link text-white"
+            className="nav-link text-white d-flex align-items-center"
             onClick={(e) => {
               e.preventDefault();
               navigate('/dashboard');
@@ -86,7 +109,7 @@ const Sidebar = ({ user }) => {
           
           <a 
             href="/projects" 
-            className="nav-link text-white"
+            className="nav-link text-white d-flex align-items-center"
             onClick={(e) => {
               e.preventDefault();
               navigate('/projects');
@@ -101,7 +124,7 @@ const Sidebar = ({ user }) => {
         <div className="mt-auto p-3 border-top border-secondary">
           <button 
             onClick={handleLogout}
-            className="btn btn-outline-light w-100"
+            className="btn btn-outline-light w-100 d-flex align-items-center justify-content-center"
           >
             <i className="bi bi-box-arrow-right me-2"></i>
             Logout

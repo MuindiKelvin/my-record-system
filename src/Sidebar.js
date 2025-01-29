@@ -57,13 +57,6 @@ function Sidebar() {
               Logout
             </button>
           </div>
-
-          {/* Copyright Section */}
-          <div className="text-center py-2 border-top border-secondary">
-            <small className="text-muted">
-              &copy; {new Date().getFullYear()} Project Manager. All rights reserved.
-            </small>
-          </div>
         </div>
       </div>
     </div>
