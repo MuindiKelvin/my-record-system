@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Activity, CheckCircle, Clock, AlertCircle, DollarSign } from 'lucide-react';
+import { Activity, CheckCircle, Clock, AlertCircle, Banknote } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -204,7 +204,7 @@ const Dashboard = () => {
         <div className="col-md-6 col-lg">
           <div className="card h-100 shadow-sm">
             <div className="card-body d-flex align-items-center">
-              <DollarSign size={32} className="text-success me-3" />
+              <Banknote size={32} className="text-success me-3" />
               <div>
                 <h6 className="card-subtitle mb-1 text-muted">Total Revenue</h6>
                 <h2 className="card-title mb-0">Ksh.{stats.totalRevenue.toLocaleString()}</h2>
