@@ -11,8 +11,9 @@ function ProjectForm() {
   
   const initialFormState = {
     orderDate: new Date().toISOString().split('T')[0],
+    submissionDate: new Date().toISOString().split('T')[0], // Added submission date
     orderRefCode: '',
-    orderType: 'normal', // Added order type field
+    orderType: 'normal',
     topic: '',
     words: '',
     cpp: '',
@@ -25,7 +26,6 @@ function ProjectForm() {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // Fetch project data for editing
   useEffect(() => {
     if (!id) return;
 
@@ -40,7 +40,8 @@ function ProjectForm() {
           setFormData({
             ...data,
             orderDate: data.orderDate || new Date().toISOString().split('T')[0],
-            orderType: data.orderType || 'normal', // Added order type
+            submissionDate: data.submissionDate || new Date().toISOString().split('T')[0],
+            orderType: data.orderType || 'normal',
             words: data.words?.toString() || '',
             cpp: data.cpp?.toString() || '',
             codeAmount: data.codeAmount?.toString() || '',
@@ -72,7 +73,6 @@ function ProjectForm() {
         [name]: type === 'checkbox' ? checked : value
       };
 
-      // Reset code amount when unchecking hasCode
       if (name === 'hasCode' && !checked) {
         newData.codeAmount = '';
       }
@@ -80,7 +80,6 @@ function ProjectForm() {
       return newData;
     });
 
-    // Clear any previous error when user makes changes
     setError('');
   };
 
@@ -89,10 +88,9 @@ function ProjectForm() {
     const cpp = parseFloat(formData.cpp) || 0;
     const codeAmount = parseFloat(formData.codeAmount) || 0;
 
-    // Apply different rates based on order type
     const baseRate = formData.orderType === 'dissertation' ? 1 : 1;
-    const wordCost = (words / 275) * cpp * baseRate;
-    const total = formData.hasCode ? wordCost + codeAmount : wordCost;
+    const wordCost = words > 0 ? (words / 275) * cpp * baseRate : 0;
+    const total = formData.hasCode && codeAmount > 0 ? wordCost + codeAmount : wordCost;
 
     return isNaN(total) ? '0.00' : total.toFixed(2);
   };
@@ -101,10 +99,17 @@ function ProjectForm() {
     const errors = [];
 
     if (!formData.orderDate) errors.push('Order date is required');
+    if (!formData.submissionDate) errors.push('Submission date is required');
     if (!formData.orderRefCode) errors.push('Order reference code is required');
     if (!formData.orderType) errors.push('Order type is required');
-    if (!formData.words || formData.words <= 0) errors.push('Valid word count is required');
-    if (!formData.cpp || formData.cpp <= 0) errors.push('Valid cost per page is required');
+    
+    // Only require word count or code amount, not both
+    if ((!formData.words || formData.words < 0) && (!formData.hasCode || !formData.codeAmount)) {
+      errors.push('Either valid word count or code amount is required');
+    }
+    if (formData.words && formData.cpp <= 0) {
+      errors.push('Valid cost per page is required when word count is specified');
+    }
     if (formData.hasCode && (!formData.codeAmount || formData.codeAmount < 0)) {
       errors.push('Valid code amount is required when code is included');
     }
@@ -127,19 +132,17 @@ function ProjectForm() {
     try {
       const projectData = {
         ...formData,
-        words: parseInt(formData.words),
-        cpp: parseFloat(formData.cpp),
-        codeAmount: formData.hasCode ? parseFloat(formData.codeAmount) : 0,
+        words: formData.words ? parseInt(formData.words) : 0,
+        cpp: formData.cpp ? parseFloat(formData.cpp) : 0,
+        codeAmount: formData.hasCode ? parseFloat(formData.codeAmount || 0) : 0,
         amount: calculateAmount(),
         lastUpdated: new Date().toISOString()
       };
 
       if (id) {
-        // Update existing project
         const projectRef = doc(db, 'projects', id);
         await updateDoc(projectRef, projectData);
       } else {
-        // Create new project
         projectData.createdAt = new Date().toISOString();
         await addDoc(collection(db, 'projects'), projectData);
       }
@@ -178,13 +181,24 @@ function ProjectForm() {
 
           <form onSubmit={handleSubmit}>
             <div className="row g-3">
-              {/* Order Details */}
               <div className="col-md-4">
                 <label className="form-label">Order Date</label>
                 <input
                   type="date"
                   name="orderDate"
                   value={formData.orderDate}
+                  onChange={handleChange}
+                  className="form-control"
+                  required
+                />
+              </div>
+
+              <div className="col-md-4">
+                <label className="form-label">Submission Date</label>
+                <input
+                  type="date"
+                  name="submissionDate"
+                  value={formData.submissionDate}
                   onChange={handleChange}
                   className="form-control"
                   required
@@ -230,17 +244,15 @@ function ProjectForm() {
                 />
               </div>
 
-              {/* Cost Calculation */}
               <div className="col-md-6">
-                <label className="form-label">Word Count</label>
+                <label className="form-label">Word Count (optional)</label>
                 <input
                   type="number"
                   name="words"
                   value={formData.words}
                   onChange={handleChange}
                   className="form-control"
-                  required
-                  min="1"
+                  min="0"
                   placeholder="Enter word count"
                 />
               </div>
@@ -253,14 +265,13 @@ function ProjectForm() {
                   value={formData.cpp}
                   onChange={handleChange}
                   className="form-control"
-                  required
                   min="0"
                   step="0.01"
                   placeholder="Enter cost per page"
+                  disabled={!formData.words}
                 />
               </div>
 
-              {/* Code Related Fields */}
               <div className="col-12">
                 <div className="form-check mb-3">
                   <input
@@ -293,7 +304,6 @@ function ProjectForm() {
                 </div>
               )}
 
-              {/* Project Status */}
               <div className="col-md-6">
                 <label className="form-label">Status</label>
                 <select
@@ -324,7 +334,6 @@ function ProjectForm() {
                 </select>
               </div>
 
-              {/* Notes */}
               <div className="col-12">
                 <label className="form-label">Notes</label>
                 <textarea
@@ -337,19 +346,17 @@ function ProjectForm() {
                 />
               </div>
 
-              {/* Amount Display */}
               <div className="col-12">
                 <div className="alert alert-info">
                   <strong>Total Amount: Ksh.{calculateAmount()}</strong>
                   <br />
                   <small>
-                    Base cost: Ksh.{((parseFloat(formData.words) / 275) * parseFloat(formData.cpp) * (formData.orderType === 'dissertation' ? 1 : 1)).toFixed(2)}
-                    {formData.hasCode && ` + Code cost: Ksh.${parseFloat(formData.codeAmount || 0).toFixed(2)}`}
+                    {formData.words > 0 && `Base cost: Ksh.${((parseFloat(formData.words) / 275) * parseFloat(formData.cpp || 0) * (formData.orderType === 'dissertation' ? 1 : 1)).toFixed(2)}`}
+                    {formData.hasCode && formData.codeAmount && ` + Code cost: Ksh.${parseFloat(formData.codeAmount || 0).toFixed(2)}`}
                   </small>
                 </div>
               </div>
 
-              {/* Form Actions */}
               <div className="col-12">
                 <div className="d-flex gap-2">
                   <button

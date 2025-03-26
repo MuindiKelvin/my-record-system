@@ -6,10 +6,9 @@ import * as XLSX from 'xlsx';
 import { CSVLink } from 'react-csv';
 import { motion } from 'framer-motion';
 import { 
-  FaListAlt, FaFileWord, FaCoins, FaCode, 
-  FaFileExcel, FaFileCsv, FaChartLine, 
+  FaListAlt, FaFileExcel, FaFileCsv, 
   FaFilter, FaSort, FaSearch, FaCalendarAlt,
-  FaArrowUp, FaArrowDown, FaFileImport
+  FaFileImport
 } from 'react-icons/fa';
 
 function ProjectList() {
@@ -26,11 +25,12 @@ function ProjectList() {
   const [sortConfig, setSortConfig] = useState({ key: 'orderDate', direction: 'desc' });
   const [exportFormat, setExportFormat] = useState('xlsx');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [showCharts, setShowCharts] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   
   const [selectedColumns, setSelectedColumns] = useState({
+    number: true,
     orderDate: true,
+    submissionDate: true,
     orderRefCode: true,
     orderType: true,
     topic: true,
@@ -41,14 +41,16 @@ function ProjectList() {
     status: true,
     priority: true,
     amount: true,
-    notes: true
+    notes: true,
+    due: true
   });
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [trendsMetric, setTrendsMetric] = useState('amount');
   const toastRef = useRef(null);
 
   const columns = [
+    { id: 'number', label: '#' },
     { id: 'orderDate', label: 'Order Date' },
+    { id: 'submissionDate', label: 'Submission Date' },
     { id: 'orderRefCode', label: 'Reference Code' },
     { id: 'orderType', label: 'Order Type' },
     { id: 'topic', label: 'Topic' },
@@ -59,10 +61,10 @@ function ProjectList() {
     { id: 'status', label: 'Status' },
     { id: 'priority', label: 'Priority' },
     { id: 'amount', label: 'Amount' },
-    { id: 'notes', label: 'Notes' }
+    { id: 'notes', label: 'Notes' },
+    { id: 'due', label: 'Due' }
   ];
 
-  // Show toast notification
   const showNotification = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
@@ -76,10 +78,32 @@ function ProjectList() {
     setIsLoading(true);
     try {
       const querySnapshot = await getDocs(collection(db, 'projects'));
-      const projectsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const currentDate = new Date();
+      const projectsData = querySnapshot.docs.map((doc, index) => {
+        const project = {
+          id: doc.id,
+          number: index + 1,
+          ...doc.data()
+        };
+        const submissionDate = new Date(project.submissionDate);
+        const timeDiff = submissionDate - currentDate;
+        const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
+        
+        return {
+          ...project,
+          daysUntilDue: daysDiff,
+          isDue: daysDiff <= 2 && daysDiff >= 0 && project.status !== 'completed' && project.status !== 'cancelled',
+          isOverdue: daysDiff < 0 && project.status !== 'completed' && project.status !== 'cancelled'
+        };
+      })
+      .sort((a, b) => {
+        if (a.status === 'completed' && b.status !== 'completed') return 1;
+        if (b.status === 'completed' && a.status !== 'completed') return -1;
+        if ((a.isDue || a.isOverdue) && !b.isDue && !b.isOverdue) return -1;
+        if ((b.isDue || b.isOverdue) && !a.isDue && !a.isOverdue) return 1;
+        return new Date(b.orderDate) - new Date(a.orderDate);
+      });
+
       setProjects(projectsData);
       setFilteredProjects(projectsData);
     } catch (err) {
@@ -139,6 +163,14 @@ function ProjectList() {
     setSortConfig({ key, direction });
 
     const sorted = [...filteredProjects].sort((a, b) => {
+      if (key === 'due') {
+        const aValue = a.daysUntilDue !== undefined ? a.daysUntilDue : Infinity;
+        const bValue = b.daysUntilDue !== undefined ? b.daysUntilDue : Infinity;
+        return direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+      if (key === 'number') {
+        return direction === 'asc' ? a.number - b.number : b.number - a.number;
+      }
       const aValue = a[key] || '';
       const bValue = b[key] || '';
       if (typeof aValue === 'number' && typeof bValue === 'number') {
@@ -179,9 +211,11 @@ function ProjectList() {
   };
 
   const prepareExportData = () => {
-    const data = filteredProjects.map(project => {
+    const data = filteredProjects.map((project, index) => {
       const rowData = {};
+      if (selectedColumns.number) rowData['#'] = startIndex + index + 1;
       if (selectedColumns.orderDate) rowData['Order Date'] = new Date(project.orderDate).toLocaleDateString();
+      if (selectedColumns.submissionDate) rowData['Submission Date'] = new Date(project.submissionDate).toLocaleDateString();
       if (selectedColumns.orderRefCode) rowData['Reference Code'] = project.orderRefCode;
       if (selectedColumns.orderType) rowData['Order Type'] = project.orderType;
       if (selectedColumns.topic) rowData['Topic'] = project.topic;
@@ -193,12 +227,17 @@ function ProjectList() {
       if (selectedColumns.priority) rowData['Priority'] = project.priority;
       if (selectedColumns.amount) rowData['Amount'] = project.amount;
       if (selectedColumns.notes) rowData['Notes'] = project.notes;
+      if (selectedColumns.due) rowData['Due'] = project.daysUntilDue !== undefined 
+        ? project.daysUntilDue < 0 
+          ? `${Math.abs(project.daysUntilDue)} days overdue`
+          : `${project.daysUntilDue} days remaining`
+        : '-';
       return rowData;
     });
 
     const totals = calculateTotals();
     const totalRow = {};
-    if (selectedColumns.orderDate) totalRow['Order Date'] = 'TOTALS';
+    if (selectedColumns.number) totalRow['#'] = 'TOTALS';
     if (selectedColumns.words) totalRow['Words'] = totals.totalWords;
     if (selectedColumns.codeAmount) totalRow['Code Amount'] = totals.totalCodeAmount;
     if (selectedColumns.amount) totalRow['Amount'] = totals.totalAmount;
@@ -266,6 +305,7 @@ function ProjectList() {
         for (const row of jsonData) {
           const projectData = {
             orderDate: row['Order Date'] || new Date().toISOString(),
+            submissionDate: row['Submission Date'] || new Date().toISOString(),
             orderRefCode: row['Reference Code'] || '',
             orderType: row['Order Type'] || 'normal',
             topic: row['Topic'] || '',
@@ -293,51 +333,7 @@ function ProjectList() {
   };
 
   const handleAddProject = () => {
-    // This assumes navigation to a new project page that returns to this component after saving
     navigate('/projects/new');
-    // Notification will be shown when returning from the new project page
-    // For demo purposes, we'll simulate it here
-    // In practice, this would be handled in the new project component
-    // showNotification('Project added successfully', 'success');
-  };
-
-  const calculateTrends = useMemo(() => {
-    if (filteredProjects.length === 0) return [];
-
-    const groupedByMonth = filteredProjects.reduce((acc, project) => {
-      const date = new Date(project.orderDate);
-      const monthYear = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      
-      if (!acc[monthYear]) {
-        acc[monthYear] = {
-          month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
-          amount: 0,
-          words: 0,
-          codeAmount: 0,
-          count: 0
-        };
-      }
-      
-      acc[monthYear].amount += Number(project.amount) || 0;
-      acc[monthYear].words += Number(project.words) || 0;
-      acc[monthYear].codeAmount += Number(project.codeAmount) || 0;
-      acc[monthYear].count += 1;
-      
-      return acc;
-    }, {});
-
-    return Object.values(groupedByMonth).sort((a, b) => {
-      const dateA = new Date(a.month);
-      const dateB = new Date(b.month);
-      return dateA - dateB;
-    });
-  }, [filteredProjects]);
-
-  const getTrendPercentage = () => {
-    if (calculateTrends.length < 2) return 0;
-    const currentValue = calculateTrends[calculateTrends.length - 1][trendsMetric];
-    const previousValue = calculateTrends[calculateTrends.length - 2][trendsMetric];
-    return previousValue === 0 ? 100 : ((currentValue - previousValue) / previousValue) * 100;
   };
 
   const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
@@ -361,7 +357,6 @@ function ProjectList() {
 
   return (
     <div className="container-fluid py-4">
-      {/* Toast Notification */}
       <div className="position-fixed top-0 end-0 p-3" style={{ zIndex: 1050 }}>
         <motion.div
           ref={toastRef}
@@ -395,12 +390,6 @@ function ProjectList() {
           </h2>
           <div>
             <button
-              className="btn btn-light me-2"
-              onClick={() => setShowCharts(!showCharts)}
-            >
-              <FaChartLine className="me-1" /> {showCharts ? 'Hide' : 'Show'} Analytics
-            </button>
-            <button
               className="btn btn-light"
               onClick={handleAddProject}
             >
@@ -410,128 +399,6 @@ function ProjectList() {
         </div>
 
         <div className="card-body">
-          {showCharts && (
-            <div className="row mb-4">
-              <div className="col-md-3">
-                <motion.div 
-                  className="card bg-primary text-white"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  whileHover={{ scale: 1.03 }}
-                >
-                  <div className="card-body d-flex align-items-center">
-                    <FaCoins className="me-3" size={36} />
-                    <div>
-                      <h5 className="mb-0">Total Amount</h5>
-                      <p className="h3 mb-0">
-                        Ksh.{Number(calculateTotals().totalAmount).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-              <div className="col-md-3">
-                <motion.div 
-                  className="card bg-success text-white"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                  whileHover={{ scale: 1.03 }}
-                >
-                  <div className="card-body d-flex align-items-center">
-                    <FaFileWord className="me-3" size={36} />
-                    <div>
-                      <h5 className="mb-0">Total Words</h5>
-                      <p className="h3 mb-0">{calculateTotals().totalWords}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-              <div className="col-md-3">
-                <motion.div 
-                  className="card bg-info text-white"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                  whileHover={{ scale: 1.03 }}
-                >
-                  <div className="card-body d-flex align-items-center">
-                    <FaCode className="me-3" size={36} />
-                    <div>
-                      <h5 className="mb-0">Total Code Amount</h5>
-                      <p className="h3 mb-0">
-                        Ksh.{Number(calculateTotals().totalCodeAmount).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-              <div className="col-md-3">
-                <motion.div 
-                  className="card bg-warning text-dark"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.3 }}
-                  whileHover={{ scale: 1.03 }}
-                >
-                  <div className="card-body">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h5 className="mb-0">
-                        <FaChartLine className="me-2" />
-                        {trendsMetric === 'amount' ? 'Revenue' : 
-                         trendsMetric === 'words' ? 'Words' : 
-                         trendsMetric === 'codeAmount' ? 'Code Revenue' : 'Orders'} Trend
-                      </h5>
-                      <select 
-                        className="form-select form-select-sm w-auto" 
-                        value={trendsMetric}
-                        onChange={(e) => setTrendsMetric(e.target.value)}
-                      >
-                        <option value="amount">Revenue</option>
-                        <option value="words">Words</option>
-                        <option value="codeAmount">Code Revenue</option>
-                        <option value="count">Order Count</option>
-                      </select>
-                    </div>
-                    <div className="d-flex align-items-center">
-                      <h3 className="mb-0">
-                        {getTrendPercentage() > 0 ? (
-                          <FaArrowUp className="text-success me-1" />
-                        ) : (
-                          <FaArrowDown className="text-danger me-1" />
-                        )}
-                        {Math.abs(getTrendPercentage()).toFixed(1)}%
-                      </h3>
-                      <small className="ms-2">vs previous period</small>
-                    </div>
-                    <div className="mt-2" style={{ height: '40px' }}>
-                      {calculateTrends.length > 0 && (
-                        <div className="d-flex align-items-end" style={{ height: '100%' }}>
-                          {calculateTrends.slice(-5).map((item, index) => (
-                            <motion.div 
-                              key={index}
-                              className="bg-dark mx-1"
-                              style={{ 
-                                width: `${100 / Math.min(5, calculateTrends.length)}%`,
-                                minWidth: '10px',
-                                borderRadius: '2px'
-                              }}
-                              title={`${item.month}: ${trendsMetric === 'amount' || trendsMetric === 'codeAmount' ? 'Ksh.' : ''}${item[trendsMetric].toLocaleString()}`}
-                              initial={{ height: 0 }}
-                              animate={{ height: `${(item[trendsMetric] / Math.max(...calculateTrends.map(i => i[trendsMetric]))) * 100}%` }}
-                              transition={{ duration: 0.5, delay: index * 0.1 }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          )}
-
           <div className="row mb-3">
             <div className="col-md-3">
               <div className="input-group">
@@ -716,8 +583,8 @@ function ProjectList() {
               <thead>
                 <tr>
                   {[
-                    'orderDate', 'orderRefCode', 'orderType', 'topic',
-                    'words', 'amount', 'status', 'priority'
+                    'number', 'orderDate', 'submissionDate', 'orderRefCode', 'orderType', 
+                    'topic', 'words', 'amount', 'status', 'priority', 'due'
                   ].map(key => (
                     <th 
                       key={key}
@@ -734,14 +601,18 @@ function ProjectList() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProjects.map(project => (
+                {paginatedProjects.map((project, index) => (
                   <motion.tr 
                     key={project.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.2 }}
+                    className={`${project.isOverdue ? 'table-danger' : 
+                              project.isDue ? 'table-warning' : ''}`}
                   >
+                    <td>{startIndex + index + 1}</td>
                     <td>{new Date(project.orderDate).toLocaleDateString()}</td>
+                    <td>{new Date(project.submissionDate).toLocaleDateString()}</td>
                     <td>{project.orderRefCode}</td>
                     <td className="text-capitalize">{project.orderType}</td>
                     <td>{project.topic}</td>
@@ -766,15 +637,17 @@ function ProjectList() {
                       </span>
                     </td>
                     <td>
+                      {project.daysUntilDue !== undefined && project.status !== 'completed' ? (
+                        project.daysUntilDue < 0 
+                          ? `${Math.abs(project.daysUntilDue)} days overdue`
+                          : `${project.daysUntilDue} days remaining`
+                      ) : '-'}
+                    </td>
+                    <td>
                       <div className="btn-group">
                         <button
                           className="btn btn-sm btn-outline-primary"
-                          onClick={() => {
-                            navigate(`/projects/edit/${project.id}`);
-                            // For simplicity, we'll show the update notification here
-                            // In a real app, this would be in the edit component after saving
-                            // showNotification('Project updated successfully', 'success');
-                          }}
+                          onClick={() => navigate(`/projects/edit/${project.id}`)}
                         >
                           Edit
                         </button>
