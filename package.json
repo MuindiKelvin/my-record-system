@@ -27,6 +27,7 @@
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
     "react-tsparticles": "^2.12.2",
+    "react-type-animation": "^3.2.0",
     "recharts": "^2.15.1",
     "styled-components": "^6.1.16",
     "tailwindcss": "^3.4.17",

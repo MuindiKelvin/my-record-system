@@ -33,8 +33,8 @@ function NotificationPage() {
         ...doc.data()
       }));
 
-      const notificationList = projectsData
-        .map(project => {
+      const notificationList = await Promise.all(
+        projectsData.map(async project => {
           const submissionDate = new Date(project.submissionDate);
           const timeDiff = submissionDate - currentDate;
           const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
@@ -47,10 +47,27 @@ function NotificationPage() {
           const isInProgressLong = project.status === 'in-progress' && 
             (currentDate - new Date(project.lastUpdated || project.orderDate)) / (1000 * 3600 * 24) > 14;
 
-          const existingNotif = existingNotifications.find(n => n.projectId === project.id) || {};
+          let existingNotif = existingNotifications.find(n => n.projectId === project.id);
 
-          return {
-            id: existingNotif.id || null,
+          // If no existing notification, create one
+          if (!existingNotif && (isDueSoon || isUrgent || isOverdue || isPendingLong || isInProgressLong)) {
+            const newNotif = {
+              projectId: project.id,
+              title: project.topic || 'Untitled Project',
+              refCode: project.orderRefCode,
+              submissionDate: project.submissionDate,
+              status: project.status,
+              isRead: false,
+              type: determineNotificationType(isDueSoon, isUrgent, isOverdue, isPendingLong, isInProgressLong),
+              daysUntilDue: daysDiff,
+              createdAt: new Date().toISOString()
+            };
+            const docRef = await addDoc(collection(db, 'notifications'), newNotif);
+            existingNotif = { id: docRef.id, ...newNotif };
+          }
+
+          return existingNotif ? {
+            id: existingNotif.id,
             projectId: project.id,
             title: project.topic || 'Untitled Project',
             refCode: project.orderRefCode,
@@ -61,9 +78,12 @@ function NotificationPage() {
             daysUntilDue: daysDiff,
             isDue: isDueSoon || isUrgent || isOverdue,
             createdAt: existingNotif.createdAt || new Date().toISOString()
-          };
+          } : null;
         })
-        .filter(notif => notif.type !== 'normal') // Only show actionable notifications
+      );
+
+      const filteredNotifications = notificationList
+        .filter(notif => notif && notif.type !== 'normal') // Only show actionable notifications with valid data
         .sort((a, b) => {
           if (a.status === 'completed' && b.status !== 'completed') return 1;
           if (b.status === 'completed' && a.status !== 'completed') return -1;
@@ -72,26 +92,9 @@ function NotificationPage() {
           return new Date(b.submissionDate) - new Date(a.submissionDate);
         });
 
-      // Add new notifications to the database if they don't exist
-      const newNotifications = notificationList.filter(n => !n.id);
-      for (const notif of newNotifications) {
-        const docRef = await addDoc(collection(db, 'notifications'), {
-          projectId: notif.projectId,
-          title: notif.title,
-          refCode: notif.refCode,
-          submissionDate: notif.submissionDate,
-          status: notif.status,
-          isRead: notif.isRead,
-          type: notif.type,
-          daysUntilDue: notif.daysUntilDue,
-          createdAt: notif.createdAt
-        });
-        notif.id = docRef.id;
-      }
-
-      setNotifications(notificationList);
+      setNotifications(filteredNotifications);
     } catch (err) {
-      setError('Error fetching notifications: ' + err.message);
+      setError('Error fetching or creating notifications: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -151,8 +154,16 @@ function NotificationPage() {
 
   const bulkToggleRead = async (markAsRead) => {
     try {
-      const updatePromises = selectedNotifications.map(notificationId => {
-        const notif = notifications.find(n => n.id === notificationId);
+      const validSelectedNotifications = selectedNotifications.filter(id => 
+        notifications.some(n => n.id === id)
+      );
+
+      if (validSelectedNotifications.length === 0) {
+        setError('No valid notifications selected for update.');
+        return;
+      }
+
+      const updatePromises = validSelectedNotifications.map(notificationId => {
         return updateDoc(doc(db, 'notifications', notificationId), {
           isRead: markAsRead,
           lastUpdated: new Date().toISOString()
@@ -163,7 +174,7 @@ function NotificationPage() {
       
       setNotifications(prev => 
         prev.map(notif => 
-          selectedNotifications.includes(notif.id) 
+          validSelectedNotifications.includes(notif.id) 
             ? { ...notif, isRead: markAsRead } 
             : notif
         )
@@ -178,14 +189,23 @@ function NotificationPage() {
   const bulkDeleteNotifications = async () => {
     if (window.confirm(`Are you sure you want to delete ${selectedNotifications.length} notifications?`)) {
       try {
-        const deletePromises = selectedNotifications.map(notificationId =>
+        const validSelectedNotifications = selectedNotifications.filter(id => 
+          notifications.some(n => n.id === id)
+        );
+
+        if (validSelectedNotifications.length === 0) {
+          setError('No valid notifications selected for deletion.');
+          return;
+        }
+
+        const deletePromises = validSelectedNotifications.map(notificationId =>
           deleteDoc(doc(db, 'notifications', notificationId))
         );
         
         await Promise.all(deletePromises);
         
         setNotifications(prev => 
-          prev.filter(notif => !selectedNotifications.includes(notif.id))
+          prev.filter(notif => !validSelectedNotifications.includes(notif.id))
         );
 
         setSelectedNotifications([]);
@@ -362,7 +382,10 @@ function NotificationPage() {
                                 className={`btn btn-sm ${
                                   notif.isRead ? 'btn-outline-secondary' : 'btn-outline-primary'
                                 }`}
-                                onClick={() => bulkToggleRead(!notif.isRead)}
+                                onClick={() => {
+                                  setSelectedNotifications([notif.id]);
+                                  bulkToggleRead(!notif.isRead);
+                                }}
                                 title={notif.isRead ? 'Mark as unread' : 'Mark as read'}
                               >
                                 {notif.isRead ? <FaEye /> : <FaCheck />}

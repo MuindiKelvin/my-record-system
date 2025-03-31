@@ -1,28 +1,129 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from './firebase';
-import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore';
-import { motion } from 'framer-motion';
+import { collection, onSnapshot, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaTachometerAlt, FaFolder, FaBell, FaMoon, FaSun, FaSignOutAlt, FaTrash, FaPalette } from 'react-icons/fa';
+import { TypeAnimation } from 'react-type-animation';
+import logo from './logo/logo.png';
+import styled, { ThemeProvider } from 'styled-components';
+
+// Define themes (same as Dashboard)
+const lightTheme = {
+  background: '#f8f9fa',
+  cardBackground: '#ffffff',
+  text: '#212529',
+  primary: '#007bff',
+  secondary: '#6c757d',
+  success: '#28a745',
+  warning: '#ffc107',
+  danger: '#dc3545',
+  shadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+  gradient: 'linear-gradient(135deg, #e0eafc, #cfdef3)'
+};
+
+const darkTheme = {
+  background: '#1a1a2e',
+  cardBackground: '#16213e',
+  text: '#e0e0e0',
+  primary: '#00d4ff',
+  secondary: '#a3bffa',
+  success: '#48bb78',
+  warning: '#ecc94b',
+  danger: '#f56565',
+  shadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+  gradient: 'linear-gradient(135deg, #2a4365, #1a1a2e)'
+};
+
+const vibrantTheme = {
+  background: '#ffeaa7',
+  cardBackground: '#fff5f5',
+  text: '#2d3748',
+  primary: '#9f7aea',
+  secondary: '#ed64a6',
+  success: '#38b2ac',
+  warning: '#ed8936',
+  danger: '#e53e3e',
+  shadow: '0 4px 15px rgba(0, 0, 0, 0.15)',
+  gradient: 'linear-gradient(135deg, #f6e05e, #ed64a6)'
+};
+
+// Styled components
+const SidebarContainer = styled.div`
+  width: ${props => (props.isCollapsed ? '80px' : '280px')};
+  min-height: 100vh;
+  transition: width 0.3s ease;
+  color: ${props => props.theme.text};
+  position: relative;
+  overflow: hidden;
+  background: ${props => props.theme.gradient};
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const NavLinkStyled = styled(NavLink)`
+  padding: 10px 15px;
+  margin: 5px 10px;
+  border-radius: 8px;
+  color: ${props => props.theme.text};
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: ${props => props.isActive ? `${props.theme.primary}33` : 'transparent'};
+  box-shadow: ${props => props.isActive ? `0 0 15px ${props.theme.primary}66` : 'none'};
+  justify-content: ${props => (props.isCollapsed ? 'center' : 'flex-start')};
+  transition: all 0.3s ease;
+  &:hover {
+    background: ${props => `${props.theme.primary}22`};
+  }
+`;
+
+const ButtonStyled = styled(motion.button)`
+  background: ${props => props.theme.primary};
+  color: ${props => props.theme.cardBackground};
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: ${props => (props.isCollapsed ? 'center' : 'flex-start')};
+  margin: 5px 0;
+  transition: all 0.3s ease;
+`;
+
+const ThemeToggle = styled(motion.button)`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: ${props => props.theme.primary};
+  color: ${props => props.theme.cardBackground};
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+`;
 
 function Sidebar({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [theme, setTheme] = useState(darkTheme);
   const [newCount, setNewCount] = useState(0);
-  const [gradientStyle, setGradientStyle] = useState({});
-  const [isProfileFlipped, setIsProfileFlipped] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isProfileHovered, setIsProfileHovered] = useState(false);
   const [notificationsPreview, setNotificationsPreview] = useState([]);
+  const [newNotificationToast, setNewNotificationToast] = useState(null);
 
-  // Dynamic gradient based on time of day
-  const updateGradient = () => {
-    const hour = new Date().getHours();
-    let gradient;
-    if (hour < 6) gradient = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'; // Night
-    else if (hour < 12) gradient = 'linear-gradient(135deg, #ff9e2c 0%, #ff6b6b 100%)'; // Morning
-    else if (hour < 18) gradient = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'; // Afternoon
-    else gradient = 'linear-gradient(135deg, #8a2387 0%, #e94057 100%)'; // Evening
-    setGradientStyle({ background: gradient });
+  // Theme toggle logic
+  const toggleTheme = () => {
+    if (theme === lightTheme) setTheme(darkTheme);
+    else if (theme === darkTheme) setTheme(vibrantTheme);
+    else setTheme(lightTheme);
   };
 
   const handleLogout = async () => {
@@ -35,15 +136,10 @@ function Sidebar({ user }) {
   };
 
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    setIsCollapsed(prev => !prev);
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.body.classList.toggle('dark-mode');
-  };
-
-  // Fetch new notifications count and preview
+  // Fetch new and unread notifications count and preview
   const fetchNotificationsData = () => {
     try {
       const unsubscribe = onSnapshot(collection(db, 'notifications'), async (snapshot) => {
@@ -52,9 +148,20 @@ function Sidebar({ user }) {
           ...doc.data()
         }));
 
-        const newNotifications = notificationsData.filter(notif => !notif.isRead && !notif.isViewed);
+        // Only count as "new" if not viewed AND not read
+        const newNotifications = notificationsData.filter(notif => !notif.isViewed && !notif.isRead);
+        const unreadNotifications = notificationsData.filter(notif => !notif.isRead);
+
+        // Check for newly added notifications to trigger toast
+        if (newNotifications.length > newCount && newNotifications.length > 0) {
+          const latestNotification = newNotifications[0];
+          setNewNotificationToast(latestNotification);
+          setTimeout(() => setNewNotificationToast(null), 5000); // Hide toast after 5 seconds
+        }
+
         setNewCount(newNotifications.length);
-        setNotificationsPreview(newNotifications.slice(0, 3)); // Show up to 3 in preview
+        setUnreadCount(unreadNotifications.length);
+        setNotificationsPreview(unreadNotifications.slice(0, 5) || []); // Show up to 5 in preview
 
         if (location.pathname === '/notifications' && newNotifications.length > 0) {
           const updatePromises = newNotifications.map(notif =>
@@ -70,195 +177,354 @@ function Sidebar({ user }) {
       return () => unsubscribe();
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotificationsPreview([]);
+      setNewCount(0);
+      setUnreadCount(0);
+    }
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = async () => {
+    try {
+      const notificationsToDelete = notificationsPreview.map(notif =>
+        deleteDoc(doc(db, 'notifications', notif.id))
+      );
+      await Promise.all(notificationsToDelete);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
     }
   };
 
   useEffect(() => {
-    updateGradient();
-    const gradientInterval = setInterval(updateGradient, 60 * 60 * 1000); // Update hourly
     const unsubscribe = fetchNotificationsData();
     return () => {
-      clearInterval(gradientInterval);
       if (unsubscribe) unsubscribe();
     };
-  }, [location.pathname]);
-
-  const sidebarStyle = {
-    width: isCollapsed ? '80px' : '250px',
-    minHeight: '100vh',
-    transition: 'width 0.3s ease',
-    color: '#ffffff',
-    position: 'relative',
-    overflow: 'hidden',
-    ...gradientStyle,
-  };
-
-  const navLinkStyle = ({ isActive }) => `
-    nav-link px-3 py-2 mb-1 rounded position-relative
-    ${isActive ? 'active bg-gradient-primary shadow-glow' : 'bg-transparent'}
-    text-white
-    ${isCollapsed ? 'text-center' : ''}
-    d-flex align-items-center
-  `;
+  }, [location.pathname, newCount]);
 
   const iconVariants = {
     hover: { scale: 1.2, rotate: 10, transition: { duration: 0.2 } },
-    initial: { scale: 1, rotate: 0 }
+    initial: { scale: 1, rotate: 0 },
+    pulse: {
+      scale: [1, 1.2, 1],
+      transition: { duration: 0.8, repeat: Infinity }
+    }
   };
 
-  const glowEffect = {
-    boxShadow: '0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(255, 255, 255, 0.3)'
+  const badgeVariants = {
+    initial: { scale: 0 },
+    animate: { scale: 1, transition: { type: 'spring', stiffness: 300 } },
+    pulse: {
+      scale: [1, 1.2, 1],
+      boxShadow: [`0 0 5px ${theme.danger}50`, `0 0 15px ${theme.danger}80`, `0 0 5px ${theme.danger}50`],
+      transition: { duration: 0.8, repeat: Infinity }
+    }
+  };
+
+  const tooltipVariants = {
+    hidden: { opacity: 0, x: 10 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.2 } }
+  };
+
+  const toastVariants = {
+    hidden: { opacity: 0, y: -50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, y: -50, transition: { duration: 0.3 } }
+  };
+
+  const profileVariants = {
+    hover: { scale: 1.05, rotateX: 10, rotateY: 10, transition: { duration: 0.3 } },
+    initial: { scale: 1, rotateX: 0, rotateY: 0 }
   };
 
   return (
-    <div className="shadow" style={sidebarStyle}>
-      <div className="d-flex flex-column h-100">
-        <motion.div
-          className="p-3 border-bottom"
-          style={{ borderColor: 'rgba(255, 255, 255, 0.2)' }}
-          onClick={() => !isCollapsed && setIsProfileFlipped(!isProfileFlipped)}
+    <ThemeProvider theme={theme}>
+      <SidebarContainer isCollapsed={isCollapsed}>
+        {/* Theme Toggle Button */}
+        <ThemeToggle
+          onClick={toggleTheme}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
         >
-          {!isCollapsed && (
+          {theme === lightTheme ? <FaSun /> : theme === darkTheme ? <FaMoon /> : <FaPalette />}
+        </ThemeToggle>
+
+        {/* Particle Animation Background */}
+        <style>
+          {`
+            @keyframes float {
+              0% { transform: translateY(0); }
+              50% { transform: translateY(-20vh); }
+              100% { transform: translateY(0); }
+            }
+            .particle {
+              position: absolute;
+              width: 5px;
+              height: 5px;
+              background: ${theme.primary};
+              border-radius: 50%;
+              opacity: 0.3;
+              animation: float ${Math.random() * 10 + 5}s infinite;
+            }
+            @keyframes glitch {
+              0% { transform: translate(0); }
+              20% { transform: translate(-2px, 2px); }
+              40% { transform: translate(2px, -2px); }
+              60% { transform: translate(-2px, 2px); }
+              80% { transform: translate(2px, -2px); }
+              100% { transform: translate(0); }
+            }
+            .glitch:hover {
+              animation: glitch 0.3s linear infinite;
+            }
+          `}
+        </style>
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div
+            key={i}
+            className="particle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+          />
+        ))}
+
+        {/* Notification Toast */}
+        <AnimatePresence>
+          {newNotificationToast && (
             <motion.div
-              animate={{ rotateY: isProfileFlipped ? 180 : 0 }}
-              transition={{ duration: 0.5 }}
-              style={{ perspective: '1000px' }}
+              className="position-fixed top-0 start-50 translate-middle-x p-3"
+              style={{ zIndex: 1050, minWidth: '200px' }}
+              variants={toastVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
             >
-              {!isProfileFlipped ? (
-                <div className="text-center">
-                  <motion.img
-                    src={user?.avatar || 'https://via.placeholder.com/40'}
-                    alt="User avatar"
-                    className="rounded-circle mb-2"
-                    style={{ width: '60px', height: '60px', border: '2px solid white' }}
-                    whileHover={{ scale: 1.1 }}
-                  />
-                  <h5 className="mb-1">KelvinMuindi</h5>
-                  <small className="text-light">{user?.email}</small>
+              <div className="toast show" style={{ background: theme.cardBackground, color: theme.text, border: `1px solid ${theme.danger}` }}>
+                <div className="toast-header">
+                  <strong className="me-auto">New Notification</strong>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setNewNotificationToast(null)}
+                  ></button>
                 </div>
-              ) : (
-                <div className="text-center text-light" style={{ transform: 'rotateY(180deg)' }}>
-                  <p className="mb-1">Active Projects: 42</p>
-                  <p className="mb-1">Pending Tasks: 15</p>
-                  <p>Completed: 87%</p>
+                <div className="toast-body">
+                  {newNotificationToast.title}: {newNotificationToast.message?.slice(0, 30) || 'No message'}...
                 </div>
-              )}
+              </div>
             </motion.div>
           )}
-          <motion.button
+        </AnimatePresence>
+
+        {/* Profile Section with Holographic Effect */}
+        <motion.div
+          className="p-3 border-bottom"
+          style={{ borderColor: `rgba(${theme.text === '#e0e0e0' ? '255, 255, 255' : '0, 0, 0'}, 0.2)` }}
+          onMouseEnter={() => setIsProfileHovered(true)}
+          onMouseLeave={() => setIsProfileHovered(false)}
+        >
+          {!isCollapsed ? (
+            <motion.div
+              className="text-center glitch"
+              variants={profileVariants}
+              initial="initial"
+              animate={isProfileHovered ? "hover" : "initial"}
+              style={{ perspective: '1000px' }}
+            >
+              <motion.img
+                src={logo}
+                alt="Company Logo"
+                className="rounded-circle mb-2"
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  border: `2px solid ${theme.primary}`,
+                  boxShadow: `0 0 15px ${theme.primary}66`,
+                  objectFit: 'cover'
+                }}
+                whileHover={{ scale: 1.1 }}
+              />
+              <TypeAnimation
+                sequence={[`Kelvin Muindi`, 1000]}
+                wrapper="h5"
+                speed={50}
+                style={{ color: theme.text, fontSize: '1.2rem', textShadow: `0 0 10px ${theme.primary}50` }}
+                repeat={0}
+              />
+              <small style={{ color: theme.text, textShadow: `0 0 5px ${theme.primary}30` }}>
+                {user?.email || 'No email'}
+              </small>
+            </motion.div>
+          ) : (
+            <motion.img
+              src={logo}
+              alt="Company Logo"
+              className="rounded-circle"
+              style={{
+                width: '40px',
+                height: '40px',
+                border: `2px solid ${theme.primary}`,
+                boxShadow: `0 0 10px ${theme.primary}50`,
+                objectFit: 'cover'
+              }}
+              whileHover={{ scale: 1.1 }}
+            />
+          )}
+          <ButtonStyled
             onClick={toggleSidebar}
-            className="btn btn-outline-light mt-2 w-100"
-            whileHover={{ scale: 1.05 }}
+            isCollapsed={isCollapsed}
+            whileHover={{ scale: 1.05, boxShadow: `0 0 15px ${theme.primary}50` }}
             whileTap={{ scale: 0.95 }}
           >
             <i className={`bi ${isCollapsed ? 'bi-arrow-right' : 'bi-arrow-left'}`}></i>
-          </motion.button>
+            {!isCollapsed && <span className="ms-2">Collapse</span>}
+          </ButtonStyled>
         </motion.div>
 
+        {/* Navigation Links */}
         <nav className="nav flex-column py-3">
-          <NavLink to="/dashboard" className={navLinkStyle}>
-            <motion.i
-              className="bi bi-speedometer2 me-2"
-              variants={iconVariants}
-              whileHover="hover"
-            />
-            {!isCollapsed && 'Dashboard'}
-          </NavLink>
-
-          <NavLink to="/projects" className={navLinkStyle}>
-            <motion.i
-              className="bi bi-folder me-2"
-              variants={iconVariants}
-              whileHover="hover"
-            />
-            {!isCollapsed && 'Projects'}
-          </NavLink>
-
-          <NavLink to="/notifications" className={navLinkStyle}>
-            <motion.i
-              className="bi bi-bell me-2"
-              variants={iconVariants}
-              whileHover="hover"
-            />
-            {!isCollapsed && (
+          <NavLinkStyled to="/dashboard" isCollapsed={isCollapsed}>
+            {({ isActive }) => (
               <>
-                Notifications
-                {newCount > 0 && (
-                  <motion.span
-                    className="badge bg-danger ms-2"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 300 }}
-                  >
-                    {newCount} New
-                  </motion.span>
-                )}
-                {newCount > 0 && (
+                <motion.div whileHover="hover" variants={iconVariants}>
+                  <FaTachometerAlt className="me-2" />
+                </motion.div>
+                {!isCollapsed && 'Dashboard'}
+                {isCollapsed && (
                   <motion.div
-                    className="position-absolute bg-dark text-white p-2 rounded shadow-lg"
-                    style={{ top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, minWidth: '200px' }}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    whileHover={{ scale: 1.05 }}
+                    className="position-absolute p-2 rounded shadow-lg"
+                    style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', zIndex: 1000, background: theme.cardBackground, color: theme.text }}
+                    variants={tooltipVariants}
+                    initial="hidden"
+                    whileHover="visible"
                   >
-                    <h6 className="mb-1">New Notifications</h6>
-                    {notificationsPreview.map(notif => (
-                      <small key={notif.id} className="d-block mb-1">
-                        {notif.title.slice(0, 20)}...
-                      </small>
-                    ))}
+                    Dashboard
                   </motion.div>
                 )}
               </>
             )}
-            {isCollapsed && newCount > 0 && (
-              <motion.span
-                className="badge bg-danger position-absolute top-0 end-0 mt-1 me-1"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-              >
-                {newCount}
-              </motion.span>
+          </NavLinkStyled>
+
+          <NavLinkStyled to="/projects" isCollapsed={isCollapsed}>
+            {({ isActive }) => (
+              <>
+                <motion.div whileHover="hover" variants={iconVariants}>
+                  <FaFolder className="me-2" />
+                </motion.div>
+                {!isCollapsed && 'Projects'}
+                {isCollapsed && (
+                  <motion.div
+                    className="position-absolute p-2 rounded shadow-lg"
+                    style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', zIndex: 1000, background: theme.cardBackground, color: theme.text }}
+                    variants={tooltipVariants}
+                    initial="hidden"
+                    whileHover="visible"
+                  >
+                    Projects
+                  </motion.div>
+                )}
+              </>
             )}
-          </NavLink>
+          </NavLinkStyled>
+
+          <NavLinkStyled to="/notifications" isCollapsed={isCollapsed}>
+            {({ isActive }) => (
+              <>
+                <motion.div
+                  whileHover="hover"
+                  animate={newCount > 0 ? "pulse" : "initial"}
+                  variants={iconVariants}
+                >
+                  <FaBell className="me-2" />
+                </motion.div>
+                {!isCollapsed && (
+                  <>
+                    Notifications
+                    {(newCount > 0 || unreadCount > 0) && (
+                      <motion.span
+                        className="badge ms-2"
+                        style={{ background: theme.danger, color: theme.cardBackground }}
+                        variants={badgeVariants}
+                        initial="initial"
+                        animate={newCount > 0 ? "pulse" : "animate"}
+                      >
+                        {newCount > 0 ? `${newCount} New` : `${unreadCount} Unread`}
+                      </motion.span>
+                    )}
+                    {unreadCount > 0 && (
+                      <motion.div
+                        className="position-absolute p-3 rounded shadow-lg"
+                        style={{ top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, minWidth: '220px', maxHeight: '200px', overflowY: 'auto', background: theme.cardBackground, color: theme.text }}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        whileHover={{ scale: 1.05 }}
+                      >
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <h6 className="mb-0">Notifications</h6>
+                          <motion.button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={clearAllNotifications}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <FaTrash /> Clear All
+                          </motion.button>
+                        </div>
+                        {notificationsPreview.length > 0 ? (
+                          notificationsPreview.map(notif => (
+                            <div key={notif.id} className="d-flex align-items-start mb-2">
+                              <div className="me-2" style={{ width: '5px', height: '5px', background: theme.primary, borderRadius: '50%' }}></div>
+                              <small>
+                                <strong>{notif.title || 'Untitled'}</strong>: {notif.message?.slice(0, 30) || 'No message'}...
+                              </small>
+                            </div>
+                          ))
+                        ) : (
+                          <small>No unread notifications</small>
+                        )}
+                      </motion.div>
+                    )}
+                  </>
+                )}
+                {isCollapsed && (newCount > 0 || unreadCount > 0) && (
+                  <motion.span
+                    className="badge position-absolute top-0 end-0 mt-1 me-1"
+                    style={{ background: theme.danger, color: theme.cardBackground }}
+                    variants={badgeVariants}
+                    initial="initial"
+                    animate={newCount > 0 ? "pulse" : "animate"}
+                  >
+                    {newCount > 0 ? newCount : unreadCount}
+                  </motion.span>
+                )}
+              </>
+            )}
+          </NavLinkStyled>
         </nav>
 
+        {/* Bottom Section */}
         <div className="mt-auto">
           {!isCollapsed && (
-            <div className="p-3 border-top" style={{ borderColor: 'rgba(255, 255, 255, 0.2)' }}>
-              <motion.button
-                onClick={toggleDarkMode}
-                className="btn btn-outline-light w-100 mb-3"
-                whileHover={{ scale: 1.05, ...glowEffect }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <motion.i
-                  className={`bi ${isDarkMode ? 'bi-moon' : 'bi-sun'} me-2`}
-                  variants={iconVariants}
-                  whileHover="hover"
-                />
-                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-              </motion.button>
-              <motion.button
+            <div className="p-3 border-top" style={{ borderColor: `rgba(${theme.text === '#e0e0e0' ? '255, 255, 255' : '0, 0, 0'}, 0.2)` }}>
+              <ButtonStyled
                 onClick={handleLogout}
-                className="btn btn-outline-light w-100"
-                whileHover={{ scale: 1.05, ...glowEffect }}
+                isCollapsed={isCollapsed}
+                whileHover={{ scale: 1.05, boxShadow: `0 0 15px ${theme.primary}50` }}
                 whileTap={{ scale: 0.95 }}
               >
-                <motion.i
-                  className="bi bi-box-arrow-right me-2"
-                  variants={iconVariants}
-                  whileHover="hover"
-                />
-                Logout
-              </motion.button>
+                <motion.div whileHover="hover" variants={iconVariants}>
+                  <FaSignOutAlt className="me-2" />
+                </motion.div>
+                {!isCollapsed && 'Logout'}
+              </ButtonStyled>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </SidebarContainer>
+    </ThemeProvider>
   );
 }
 
