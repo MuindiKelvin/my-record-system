@@ -186,12 +186,10 @@ function ProjectList() {
   const calculateTotals = () => {
     return filteredProjects.reduce(
       (acc, project) => {
-        acc.totalWords += Number(project.words) || 0;
         acc.totalAmount += Number(project.amount) || 0;
-        acc.totalCodeAmount += Number(project.codeAmount) || 0;
         return acc;
       },
-      { totalWords: 0, totalAmount: 0, totalCodeAmount: 0 }
+      { totalAmount: 0 }
     );
   };
 
@@ -235,14 +233,35 @@ function ProjectList() {
       return rowData;
     });
 
+    return data;
+  };
+
+  const prepareCSVExportData = () => {
+    const data = prepareExportData();
     const totals = calculateTotals();
+    const headers = Object.keys(data[0] || {});
+    const amountColIndex = headers.indexOf('Amount');
+
+    // Add two empty rows
+    data.push({});
+    data.push({});
+
+    // Add total row
     const totalRow = {};
-    if (selectedColumns.number) totalRow['#'] = 'TOTALS';
-    if (selectedColumns.words) totalRow['Words'] = totals.totalWords;
-    if (selectedColumns.codeAmount) totalRow['Code Amount'] = totals.totalCodeAmount;
-    if (selectedColumns.amount) totalRow['Amount'] = totals.totalAmount;
-    
-    return [...data, totalRow];
+    if (amountColIndex >= 0) {
+      // Place "Total:" in the column before Amount
+      totalRow[headers[amountColIndex - 1]] = 'Total:';
+      // Place the total amount in the Amount column
+      totalRow['Amount'] = totals.totalAmount;
+    } else {
+      // If Amount column is not selected, add at the end
+      const lastCol = headers[headers.length - 1];
+      totalRow[lastCol] = 'Total:';
+      totalRow['Total Amount'] = totals.totalAmount;
+    }
+
+    data.push(totalRow);
+    return data;
   };
 
   const exportData = () => {
@@ -252,6 +271,7 @@ function ProjectList() {
     }
 
     const dataToExport = prepareExportData();
+    const totals = calculateTotals();
     const monthYear = startDate ? getMonthYearString(startDate) : getMonthYearString(new Date());
     const categoryMap = {
       'normal': 'Kevz_Normal_Invoice',
@@ -261,7 +281,49 @@ function ProjectList() {
     const filenameBase = `${categoryMap[selectedCategory] || 'Kevz_Projects'}_${monthYear}`;
 
     if (exportFormat === 'xlsx') {
+      // Create worksheet from data
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      
+      // Calculate the position for total (two rows below last data row)
+      const lastRow = dataToExport.length + 1; // +1 for header
+      const totalRow = lastRow + 2; // Two rows below
+      
+      // Find the column position for Amount
+      const headers = Object.keys(dataToExport[0] || {});
+      const amountColIndex = headers.indexOf('Amount');
+      
+      if (amountColIndex >= 0) {
+        const amountColLetter = XLSX.utils.encode_col(amountColIndex);
+        
+        // Add "Total:" label in the column before Amount
+        const labelCellAddress = `${XLSX.utils.encode_col(amountColIndex - 1)}${totalRow}`;
+        worksheet[labelCellAddress] = { t: 's', v: 'Total:' };
+        
+        // Add the total amount in the Amount column
+        const totalCellAddress = `${amountColLetter}${totalRow}`;
+        worksheet[totalCellAddress] = { t: 'n', v: totals.totalAmount };
+        
+        // Update the worksheet range to include the total row
+        worksheet['!ref'] = XLSX.utils.encode_range({
+          s: { c: 0, r: 0 },
+          e: { c: Math.max(amountColIndex, 1), r: totalRow }
+        });
+      } else {
+        // If Amount column is not selected, add total at the end
+        const lastColIndex = headers.length - 1;
+        const lastColLetter = XLSX.utils.encode_col(lastColIndex);
+        const labelCellAddress = `${lastColLetter}${totalRow}`;
+        const totalCellAddress = `${XLSX.utils.encode_col(lastColIndex + 1)}${totalRow}`;
+        
+        worksheet[labelCellAddress] = { t: 's', v: 'Total:' };
+        worksheet[totalCellAddress] = { t: 'n', v: totals.totalAmount };
+        
+        worksheet['!ref'] = XLSX.utils.encode_range({
+          s: { c: 0, r: 0 },
+          e: { c: lastColIndex + 1, r: totalRow }
+        });
+      }
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Projects');
       XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
@@ -481,10 +543,11 @@ function ProjectList() {
                   </button>
                 ) : (
                   <CSVLink
-                    data={prepareExportData()}
-                    filename={`${selectedCategory === 'all' ? 'Kevz_All_Invoice' : 
+                    data={prepareCSVExportData()}
+                    filename={`${selectedCategory === 'all' ? 'Kevz Ascending' : true,
                       selectedCategory === 'normal' ? 'Kevz_Normal_Invoice' : 
-                      'Kevz_Dissertations_Invoice'}_${getMonthYearString(startDate || new Date())}.csv`}
+                      selectedCategory === 'dissertation' ? 'Kevz_Dissertations_Invoice' : 
+                      'Kevz_All_Invoice'}_${getMonthYearString(startDate || new Date())}.csv`}
                     className="btn btn-success"
                     onClick={() => {
                       if (!Object.values(selectedColumns).some(Boolean)) {
@@ -494,6 +557,7 @@ function ProjectList() {
                       }
                       showNotification('Projects exported successfully', 'success');
                       setError('');
+                      return true;
                     }}
                   >
                     <FaFileCsv className="me-1" /> Export
@@ -693,7 +757,7 @@ function ProjectList() {
                     Previous
                   </button>
                 </li>
-                {[...Array(totalPages)].map((_, index) => (
+                 {[...Array(totalPages)].map((_, index) => (
                   <li
                     key={index + 1}
                     className={`page-item ${currentPage === index + 1 ? 'active' : ''}`}
