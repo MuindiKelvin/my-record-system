@@ -7,7 +7,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 import { motion } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 
-// Define themes
+// Define themes (unchanged)
 const lightTheme = {
   background: '#f8f9fa',
   cardBackground: '#ffffff',
@@ -47,7 +47,7 @@ const vibrantTheme = {
   gradient: 'linear-gradient(135deg, #f6e05e, #ed64a6)'
 };
 
-// Styled components
+// Styled components (unchanged)
 const DashboardContainer = styled(motion.div)`
   background: ${props => props.theme.background};
   color: ${props => props.theme.text};
@@ -112,7 +112,7 @@ function Dashboard() {
   const [compareMonth, setCompareMonth] = useState(null);
   const [compareYear, setCompareYear] = useState(null);
 
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#9f7aea', '#ed64a6'];
 
@@ -234,10 +234,10 @@ function Dashboard() {
     { name: 'Pending', value: compareStats.pending },
   ] : null;
 
-  // Project Trends Data (Total Projects, Completed, Normal, Dissertation)
+  // Project Trends Data (Total Projects, Completed, Normal, Dissertation) with full month and year
   const projectTrendsData = projects.reduce((acc, project) => {
     const date = new Date(project.orderDate);
-    const monthYear = `${date.toLocaleString('default', { month: 'short' })}`;
+    const monthYear = `${months[date.getMonth()]} ${date.getFullYear()}`;
     if (!acc[monthYear]) {
       acc[monthYear] = {
         month: monthYear,
@@ -259,7 +259,7 @@ function Dashboard() {
   const currentDate = new Date();
   for (let i = 5; i >= 0; i--) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-    const monthYear = `${date.toLocaleString('default', { month: 'short' })}`;
+    const monthYear = `${months[date.getMonth()]} ${date.getFullYear()}`;
     recentMonths.push({
       month: monthYear,
       totalProjects: projectTrendsData[monthYear]?.totalProjects || 0,
@@ -269,10 +269,10 @@ function Dashboard() {
     });
   }
 
-  // Project Type Trend Data
+  // Project Type Trend Data with full month and year
   const typeTrendData = projects.reduce((acc, project) => {
     const date = new Date(project.orderDate);
-    const monthYear = `${date.toLocaleString('default', { month: 'short' })}`;
+    const monthYear = `${months[date.getMonth()]} ${date.getFullYear()}`;
     const type = project.orderType || 'Unknown';
     if (!acc[monthYear]) {
       acc[monthYear] = { month: monthYear };
@@ -286,7 +286,7 @@ function Dashboard() {
   const typeTrendArray = [];
   for (let i = 5; i >= 0; i--) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-    const monthYear = `${date.toLocaleString('default', { month: 'short' })}`;
+    const monthYear = `${months[date.getMonth()]} ${date.getFullYear()}`;
     const entry = { month: monthYear };
     uniqueTypes.forEach(type => {
       entry[type] = typeTrendData[monthYear]?.[type] || 0;
@@ -592,7 +592,7 @@ function Dashboard() {
                           type="monotone"
                           dataKey={type}
                           stroke={COLORS[index % COLORS.length]}
-                          name={type.charAt(0).toUpperCase() + type.slice(1)} // Capitalize type name
+                          name={type.charAt(0).toUpperCase() + type.slice(1)}
                           strokeWidth={1.5}
                           dot={{ r: 4, fill: COLORS[index % COLORS.length] }}
                           activeDot={{ r: 6 }}
