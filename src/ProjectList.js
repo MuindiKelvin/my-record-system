@@ -74,11 +74,27 @@ function ProjectList() {
     return new Date(date).toLocaleString('default', { month: 'short', year: 'numeric' });
   };
 
+  // Helper function to get month-year key for sorting
+  const getMonthYearKey = (date) => {
+    const d = new Date(date);
+    return d.getFullYear() * 12 + d.getMonth(); // Creates a comparable numeric key
+  };
+
+  // Helper function to check if date is in current month
+  const isCurrentMonth = (date) => {
+    const now = new Date();
+    const projectDate = new Date(date);
+    return now.getFullYear() === projectDate.getFullYear() && 
+           now.getMonth() === projectDate.getMonth();
+  };
+
   const fetchProjects = async () => {
     setIsLoading(true);
     try {
       const querySnapshot = await getDocs(collection(db, 'projects'));
       const currentDate = new Date();
+      const currentMonthKey = getMonthYearKey(currentDate);
+      
       const projectsData = querySnapshot.docs.map((doc, index) => {
         const project = {
           id: doc.id,
@@ -86,6 +102,7 @@ function ProjectList() {
           ...doc.data()
         };
         const submissionDate = new Date(project.submissionDate);
+        const orderDate = new Date(project.orderDate);
         const timeDiff = submissionDate - currentDate;
         const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
         
@@ -93,19 +110,42 @@ function ProjectList() {
           ...project,
           daysUntilDue: daysDiff,
           isDue: daysDiff <= 2 && daysDiff >= 0 && project.status !== 'completed' && project.status !== 'cancelled',
-          isOverdue: daysDiff < 0 && project.status !== 'completed' && project.status !== 'cancelled'
+          isOverdue: daysDiff < 0 && project.status !== 'completed' && project.status !== 'cancelled',
+          monthYearKey: getMonthYearKey(orderDate),
+          isCurrentMonth: isCurrentMonth(orderDate)
         };
       })
       .sort((a, b) => {
+        // First, prioritize by completion status (incomplete projects first)
         if (a.status === 'completed' && b.status !== 'completed') return 1;
         if (b.status === 'completed' && a.status !== 'completed') return -1;
+        
+        // Then prioritize overdue and due projects
         if ((a.isDue || a.isOverdue) && !b.isDue && !b.isOverdue) return -1;
         if ((b.isDue || b.isOverdue) && !a.isDue && !a.isOverdue) return 1;
+        
+        // Then sort by month-year (current month first, then descending by month-year)
+        if (a.monthYearKey !== b.monthYearKey) {
+          // Current month projects come first
+          if (a.monthYearKey === currentMonthKey && b.monthYearKey !== currentMonthKey) return -1;
+          if (b.monthYearKey === currentMonthKey && a.monthYearKey !== currentMonthKey) return 1;
+          
+          // For non-current month projects, sort in descending order (latest months first)
+          return b.monthYearKey - a.monthYearKey;
+        }
+        
+        // Within the same month, sort by order date (latest first)
         return new Date(b.orderDate) - new Date(a.orderDate);
       });
 
-      setProjects(projectsData);
-      setFilteredProjects(projectsData);
+      // Renumber projects after sorting
+      const renumberedProjects = projectsData.map((project, index) => ({
+        ...project,
+        number: index + 1
+      }));
+
+      setProjects(renumberedProjects);
+      setFilteredProjects(renumberedProjects);
     } catch (err) {
       setError('Error fetching projects: ' + err.message);
     } finally {
@@ -142,6 +182,33 @@ function ProjectList() {
     if (selectedCategory !== 'all') {
       results = results.filter(project => project.orderType === selectedCategory);
     }
+
+    // Maintain the month-based sorting even after filtering
+    const currentDate = new Date();
+    const currentMonthKey = getMonthYearKey(currentDate);
+    
+    results = results.sort((a, b) => {
+      // First, prioritize by completion status (incomplete projects first)
+      if (a.status === 'completed' && b.status !== 'completed') return 1;
+      if (b.status === 'completed' && a.status !== 'completed') return -1;
+      
+      // Then prioritize overdue and due projects
+      if ((a.isDue || a.isOverdue) && !b.isDue && !b.isOverdue) return -1;
+      if ((b.isDue || b.isOverdue) && !a.isDue && !a.isOverdue) return 1;
+      
+      // Then sort by month-year (current month first, then descending by month-year)
+      if (a.monthYearKey !== b.monthYearKey) {
+        // Current month projects come first
+        if (a.monthYearKey === currentMonthKey && b.monthYearKey !== currentMonthKey) return -1;
+        if (b.monthYearKey === currentMonthKey && a.monthYearKey !== currentMonthKey) return 1;
+        
+        // For non-current month projects, sort in descending order (latest months first)
+        return b.monthYearKey - a.monthYearKey;
+      }
+      
+      // Within the same month, sort by order date (latest first)
+      return new Date(b.orderDate) - new Date(a.orderDate);
+    });
 
     setFilteredProjects(results);
     setCurrentPage(1);
