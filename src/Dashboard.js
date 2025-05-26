@@ -7,7 +7,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 import { motion } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 
-// Define themes (unchanged)
+// Define themes
 const lightTheme = {
   background: '#f8f9fa',
   cardBackground: '#ffffff',
@@ -47,7 +47,7 @@ const vibrantTheme = {
   gradient: 'linear-gradient(135deg, #f6e05e, #ed64a6)'
 };
 
-// Styled components (unchanged)
+// Styled components
 const DashboardContainer = styled(motion.div)`
   background: ${props => props.theme.background};
   color: ${props => props.theme.text};
@@ -91,6 +91,27 @@ const ThemeToggle = styled(motion.button)`
   z-index: 1000;
 `;
 
+const ComparisonLegend = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  gap: 20px;
+  font-size: 0.9rem;
+`;
+
+const LegendItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+`;
+
+const LegendColor = styled.div`
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: ${props => props.color};
+`;
+
 function Dashboard() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -115,6 +136,38 @@ function Dashboard() {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#9f7aea', '#ed64a6'];
+
+  // Get most recent projects based on submission date
+  const getRecentProjects = (projectsData) => {
+    return projectsData
+      .sort((a, b) => new Date(b.submissionDate) - new Date(a.submissionDate))
+      .slice(0, 10);
+  };
+
+  // Custom tooltip for pie chart with comparison
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div style={{
+          background: theme.cardBackground,
+          color: theme.text,
+          padding: '10px',
+          border: `1px solid ${theme.primary}`,
+          borderRadius: '5px',
+          boxShadow: theme.shadow
+        }}>
+          <p>{`${data.payload.name}: ${data.value}`}</p>
+          {compareStats && (
+            <p style={{ fontSize: '0.9em', opacity: 0.8 }}>
+              {`(Compare: ${data.payload.compareValue || 0})`}
+            </p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   const fetchProjects = async () => {
     setIsLoading(true);
@@ -221,18 +274,24 @@ function Dashboard() {
     else setTheme(lightTheme);
   };
 
-  // Chart data preparation
+  // Chart data preparation with comparison values
   const statusData = [
-    { name: 'Completed', value: stats.completed },
-    { name: 'In Progress', value: stats.inProgress },
-    { name: 'Pending', value: stats.pending },
+    { 
+      name: 'Completed', 
+      value: stats.completed,
+      compareValue: compareStats?.completed || 0
+    },
+    { 
+      name: 'In Progress', 
+      value: stats.inProgress,
+      compareValue: compareStats?.inProgress || 0
+    },
+    { 
+      name: 'Pending', 
+      value: stats.pending,
+      compareValue: compareStats?.pending || 0
+    },
   ];
-
-  const compareStatusData = compareStats ? [
-    { name: 'Completed', value: compareStats.completed },
-    { name: 'In Progress', value: compareStats.inProgress },
-    { name: 'Pending', value: compareStats.pending },
-  ] : null;
 
   // Project Trends Data (Total Projects, Completed, Normal, Dissertation) with full month and year
   const projectTrendsData = projects.reduce((acc, project) => {
@@ -397,7 +456,9 @@ function Dashboard() {
                     >
                       {value}
                     </motion.h2>
-                    {compare && <small>vs {compare}</small>}
+                    {compare !== null && compare !== undefined && (
+                      <small>vs {compare}</small>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -411,17 +472,22 @@ function Dashboard() {
             <Card>
               <GradientHeader>
                 <h5><FaChartPie className="me-2" /> Project Status Distribution</h5>
+                {compareStats && (
+                  <small>
+                    Current: {months[filterMonth] || 'All'} {filterYear} vs Compare: {months[compareMonth]} {compareYear}
+                  </small>
+                )}
               </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="card-body" style={{ height: '400px' }}>
+                <ResponsiveContainer width="100%" height="85%">
                   <PieChart>
                     <Pie
                       data={statusData}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={100}
+                      label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                      outerRadius={compareStats ? 80 : 100}
                       fill="#8884d8"
                       dataKey="value"
                       animationBegin={0}
@@ -431,29 +497,40 @@ function Dashboard() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    {compareStatusData && (
+                    {compareStats && (
                       <Pie
-                        data={compareStatusData}
+                        data={statusData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={110}
-                        outerRadius={130}
+                        innerRadius={85}
+                        outerRadius={105}
                         fill="#82ca9d"
-                        dataKey="value"
-                        opacity={0.6}
-                        label
-                        animationBegin={0}
+                        dataKey="compareValue"
+                        opacity={0.7}
+                        label={({ compareValue }) => compareValue > 0 ? compareValue : ''}
+                        animationBegin={500}
                         animationDuration={1500}
                       >
-                        {compareStatusData.map((entry, index) => (
+                        {statusData.map((entry, index) => (
                           <Cell key={`compare-cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                     )}
-                    <Tooltip contentStyle={{ background: theme.cardBackground, color: theme.text }} />
-                    <Legend />
+                    <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
+                {compareStats && (
+                  <ComparisonLegend>
+                    <LegendItem>
+                      <LegendColor color={COLORS[0]} />
+                      <span>Inner: Current Period</span>
+                    </LegendItem>
+                    <LegendItem>
+                      <LegendColor color={COLORS[0]} style={{ opacity: 0.7 }} />
+                      <span>Outer: Compare Period</span>
+                    </LegendItem>
+                  </ComparisonLegend>
+                )}
               </div>
             </Card>
           </div>
@@ -463,7 +540,7 @@ function Dashboard() {
               <GradientHeader>
                 <h5><FaChartLine className="me-2" /> Project Trends</h5>
               </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
+              <div className="card-body" style={{ height: '400px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={recentMonths} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
@@ -519,7 +596,7 @@ function Dashboard() {
           <div className="col-md-8 mb-4">
             <Card>
               <GradientHeader className="d-flex justify-content-between align-items-center">
-                <h5><FaFolder className="me-2" /> Recent Projects</h5>
+                <h5><FaFolder className="me-2" /> Recent Projects (Latest 10 by Submission Date)</h5>
                 <motion.button
                   className="btn btn-outline-primary btn-sm"
                   onClick={() => navigate('/projects')}
@@ -529,7 +606,7 @@ function Dashboard() {
                   View All
                 </motion.button>
               </GradientHeader>
-              <div className="card-body" style={{ height: '350px', overflowY: 'auto', direction: 'rtl' }}>
+              <div className="card-body" style={{ height: '400px', overflowY: 'auto', direction: 'rtl' }}>
                 <div style={{ direction: 'ltr' }}>
                   <table className="table table-hover">
                     <thead>
@@ -543,7 +620,7 @@ function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {projects.slice(0, 10).map((project, index) => (
+                      {getRecentProjects(projects).map((project, index) => (
                         <motion.tr
                           key={project.id}
                           onClick={() => navigate(`/projects/edit/${project.id}`)}
@@ -575,7 +652,7 @@ function Dashboard() {
               <GradientHeader>
                 <h5><FaChartLine className="me-2" /> Project Type Trend</h5>
               </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
+              <div className="card-body" style={{ height: '400px' }}>
                 {typeTrendArray.length === 0 ? (
                   <p className="text-muted">No project types in this period</p>
                 ) : (
