@@ -11,7 +11,7 @@ import {
   FaSort, FaSortUp, FaSortDown, FaChevronLeft, FaChevronRight,
   FaSync, FaSun, FaMoon, FaPalette,
   FaBolt, FaLayerGroup,
-  FaPrint, FaFileInvoiceDollar,
+  FaPrint, FaFileInvoiceDollar, FaCalendarAlt,
 } from 'react-icons/fa';
 
 // ─── Themes ────────────────────────────────────────────────────────────────────
@@ -770,6 +770,15 @@ const ReceiptWrapper = styled(motion.div)`
   margin: auto;
 `;
 
+// ─── Monthly Receipt Preview (wider) ──────────────────────────────────────────
+const MonthReceiptWrapper = styled(motion.div)`
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+`;
+
 const ReceiptCard = styled.div`
   background: #fafaf8;
   color: #1a1a1a;
@@ -1015,6 +1024,91 @@ const ReceiptPreviewLabel = styled.div`
   margin-bottom: 0.5rem;
 `;
 
+// ─── Monthly Statement Preview Styled Components ───────────────────────────────
+
+const MonthSummaryGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+`;
+
+const MonthSummaryCard = styled.div`
+  border-radius: 4px;
+  padding: 0.55rem 0.6rem;
+  text-align: center;
+  background: ${p => p.$bg};
+  border: 1px solid ${p => p.$border};
+`;
+
+const MonthRateBarBg = styled.div`
+  background: #e8e4da;
+  border-radius: 3px;
+  height: 7px;
+  overflow: hidden;
+  margin-top: 0.3rem;
+`;
+
+const MonthRateBarFill = styled.div`
+  height: 100%;
+  border-radius: 3px;
+  width: ${p => p.$pct}%;
+  background: ${p => p.$c};
+`;
+
+const MonthStatusPills = styled.div`
+  display: flex;
+  gap: 0.45rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+`;
+
+const MonthStatusPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: ${p => p.$bg};
+  color: ${p => p.$c};
+  border: 1px solid ${p => p.$border};
+`;
+
+const MonthOrderTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.66rem;
+  margin-top: 0.4rem;
+  max-height: 220px;
+  display: block;
+  overflow-y: auto;
+
+  thead { display: table; width: 100%; table-layout: fixed; }
+  tbody { display: table; width: 100%; table-layout: fixed; }
+
+  th {
+    background: #1a1a2e;
+    color: #fafaf8;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.57rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: left;
+    font-weight: 700;
+  }
+  th:last-child { text-align: right; }
+  th:nth-child(4) { text-align: right; }
+
+  td {
+    padding: 0.32rem 0.6rem;
+    border-bottom: 1px solid #ece8e0;
+    color: #333;
+  }
+`;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = n => `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
 
@@ -1043,7 +1137,6 @@ const effectiveStatus = (p) => {
 
   if (amount > 0 && amountPaid >= amount) return 'paid';
   if (amountPaid > 0 && amountPaid < amount) return 'partial';
-  // If stored says paid/partial but numbers disagree, trust numbers
   if (stored === 'paid' && amountPaid < amount) return amountPaid > 0 ? 'partial' : 'unpaid';
   return stored;
 };
@@ -1141,21 +1234,23 @@ export default function PaymentTracker() {
     return () => clearInterval(id);
   }, []);
 
-  const [projects,      setProjects]      = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [search,        setSearch]        = useState('');
-  const [filterStatus,  setFilterStatus]  = useState('all');
-  const [filterMonth,   setFilterMonth]   = useState('all');
-  const [itemsPerPage,  setItemsPerPage]  = useState(15);
-  const [currentPage,   setCurrentPage]   = useState(1);
-  const [sortConfig,    setSortConfig]    = useState({ key: 'orderDate', direction: 'desc' });
-  const [saving,        setSaving]        = useState({});
-  const [editState,     setEditState]     = useState({});
-  const [toast,         setToast]         = useState(null);
-  const [cfModal,       setCfModal]       = useState(false);
-  const [cfCandidates,  setCfCandidates]  = useState([]);
-  const [cfRunning,     setCfRunning]     = useState(false);
-  const [receiptProject, setReceiptProject] = useState(null);
+  const [projects,          setProjects]          = useState([]);
+  const [loading,           setLoading]           = useState(true);
+  const [search,            setSearch]            = useState('');
+  const [filterStatus,      setFilterStatus]      = useState('all');
+  const [filterMonth,       setFilterMonth]       = useState('all');
+  const [itemsPerPage,      setItemsPerPage]      = useState(15);
+  const [currentPage,       setCurrentPage]       = useState(1);
+  const [sortConfig,        setSortConfig]        = useState({ key: 'orderDate', direction: 'desc' });
+  const [saving,            setSaving]            = useState({});
+  const [editState,         setEditState]         = useState({});
+  const [toast,             setToast]             = useState(null);
+  const [cfModal,           setCfModal]           = useState(false);
+  const [cfCandidates,      setCfCandidates]      = useState([]);
+  const [cfRunning,         setCfRunning]         = useState(false);
+  const [receiptProject,    setReceiptProject]    = useState(null);
+  // ── NEW: monthly statement preview ──
+  const [monthReceiptOpen,  setMonthReceiptOpen]  = useState(false);
 
   const searchRef = useRef(null);
 
@@ -1167,7 +1262,8 @@ export default function PaymentTracker() {
         searchRef.current?.focus();
       }
       if (e.key === 'Escape') {
-        if (receiptProject) { setReceiptProject(null); return; }
+        if (monthReceiptOpen) { setMonthReceiptOpen(false); return; }
+        if (receiptProject)   { setReceiptProject(null); return; }
         if (document.activeElement === searchRef.current) {
           setSearch('');
           searchRef.current?.blur();
@@ -1183,7 +1279,7 @@ export default function PaymentTracker() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [editState, activeThemeName, receiptProject]);
+  }, [editState, activeThemeName, receiptProject, monthReceiptOpen]);
 
   // ── Fetch ──
   const fetchProjects = async () => {
@@ -1234,7 +1330,6 @@ export default function PaymentTracker() {
     let { status, amountPaid } = ed;
     amountPaid = Number(amountPaid) || 0;
 
-    // Reconcile status with actual numbers
     if (amountPaid >= totalAmount && totalAmount > 0) status = 'paid';
     else if (amountPaid > 0 && amountPaid < totalAmount) status = 'partial';
     else if (amountPaid <= 0) status = 'unpaid';
@@ -1396,7 +1491,7 @@ export default function PaymentTracker() {
     }
   };
 
-  // ── Receipt printing ──
+  // ── Receipt printing (single order) ──
   const printReceiptToWindow = (p) => {
     const statusS    = effectiveStatus(p);
     const totalAmt   = Number(p.amount) || 0;
@@ -1544,12 +1639,10 @@ export default function PaymentTracker() {
   // ── MONTHLY RECEIPT / STATEMENT ───────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────────────────────
   const printMonthlyReceipt = (monthKey) => {
-    // Get the human-readable month label
     const [yr, mo] = monthKey.split('-');
     const monthLabel = new Date(Number(yr), Number(mo) - 1, 1)
       .toLocaleString('en-KE', { month: 'long', year: 'numeric' });
 
-    // Collect all orders for the month, sorted by date
     const monthOrders = projects
       .filter(p => {
         const d = new Date(p.orderDate);
@@ -1563,9 +1656,8 @@ export default function PaymentTracker() {
       return;
     }
 
-    // Aggregate totals
-    const totalInvoiced   = monthOrders.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
-    const totalReceived   = monthOrders.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
+    const totalInvoiced    = monthOrders.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
+    const totalReceived    = monthOrders.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
     const totalOutstanding = monthOrders.reduce((s, p) => s + effectiveBalance(p), 0);
     const cPaid    = monthOrders.filter(p => effectiveStatus(p) === 'paid').length;
     const cPartial = monthOrders.filter(p => effectiveStatus(p) === 'partial').length;
@@ -1581,7 +1673,6 @@ export default function PaymentTracker() {
       hour: '2-digit', minute: '2-digit',
     });
 
-    // Build per-order rows grouped by status
     const groups = [
       { label: 'Fully Paid', status: 'paid',    color: '#1a6b3c', bg: '#d1fae5', mark: '✓' },
       { label: 'Partial',    status: 'partial',  color: '#b45309', bg: '#fef3c7', mark: '◑' },
@@ -1637,7 +1728,6 @@ export default function PaymentTracker() {
           </tr>`;
       });
 
-      // Group subtotal
       const grpTotal    = group.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
       const grpReceived = group.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
       const grpBal      = group.reduce((s, p) => s + effectiveBalance(p), 0);
@@ -1654,7 +1744,6 @@ export default function PaymentTracker() {
         </tr>`;
     });
 
-    // Barcode from month key
     const bars = genBars(monthKey);
     const barsHtml = bars.map(b =>
       `<div style="background:#2a2a2a;width:${b.w}px;height:${b.h}px;flex-shrink:0;"></div>`
@@ -1669,165 +1758,64 @@ export default function PaymentTracker() {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
-
-  body {
-    background: #1c1c28;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2.5rem 1rem 3rem;
-    font-family: 'Space Mono', 'Courier New', monospace;
-  }
-
-  .page-title {
-    color: rgba(255,255,255,0.25);
-    font-size: 0.58rem;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    margin-bottom: 1.25rem;
-  }
-
-  .receipt-outer {
-    width: 100%;
-    max-width: 620px;
-    filter: drop-shadow(0 20px 48px rgba(0,0,0,0.6));
-  }
-
-  .tear {
-    height: 18px;
-    background-size: 20px 20px;
-    background-repeat: repeat-x;
-  }
-  .tear-top    { background-color:#1c1c28; background-image:radial-gradient(circle at 10px -2px, #1c1c28 9px, #faf8f3 9px); }
-  .tear-bottom { background-color:#1c1c28; background-image:radial-gradient(circle at 10px 20px, #1c1c28 9px, #faf8f3 9px); }
-
-  .receipt-body {
-    background: #faf8f3;
-    padding: 1.6rem 1.85rem 1.25rem;
-    color: #1c1c1c;
-  }
-
-  /* Header */
+  body { background:#1c1c28; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:2.5rem 1rem 3rem; font-family:'Space Mono','Courier New',monospace; }
+  .page-title { color:rgba(255,255,255,0.25); font-size:0.58rem; letter-spacing:0.3em; text-transform:uppercase; margin-bottom:1.25rem; }
+  .receipt-outer { width:100%; max-width:620px; filter:drop-shadow(0 20px 48px rgba(0,0,0,0.6)); }
+  .tear { height:18px; background-size:20px 20px; background-repeat:repeat-x; }
+  .tear-top    { background-color:#1c1c28; background-image:radial-gradient(circle at 10px -2px,#1c1c28 9px,#faf8f3 9px); }
+  .tear-bottom { background-color:#1c1c28; background-image:radial-gradient(circle at 10px 20px,#1c1c28 9px,#faf8f3 9px); }
+  .receipt-body { background:#faf8f3; padding:1.6rem 1.85rem 1.25rem; color:#1c1c1c; }
   .r-header { text-align:center; padding-bottom:1rem; margin-bottom:1rem; border-bottom:2px dashed #ddd8ce; }
   .r-logo-row { display:flex; align-items:center; justify-content:center; gap:0.65rem; margin-bottom:0.3rem; }
-  .r-icon-box { width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg,#1c1c28,#2a2a3e);
-    display:flex; align-items:center; justify-content:center; font-size:1rem; }
+  .r-icon-box { width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg,#1c1c28,#2a2a3e); display:flex; align-items:center; justify-content:center; font-size:1rem; }
   .r-brand { font-size:1rem; font-weight:700; letter-spacing:0.2em; text-transform:uppercase; color:#1c1c1c; }
   .r-subbrand { font-size:0.56rem; color:#b0a898; letter-spacing:0.16em; text-transform:uppercase; margin-top:0.1rem; }
-  .r-month-badge {
-    display:inline-block; margin-top:0.6rem;
-    background:#1c1c28; color:#faf8f3;
-    font-size:0.72rem; font-weight:700; letter-spacing:0.15em;
-    text-transform:uppercase; padding:0.35rem 1.2rem; border-radius:2px;
-  }
-
-  /* Summary cards */
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.6rem;
-    margin-bottom: 1.1rem;
-  }
-  .summary-card {
-    border-radius: 4px;
-    padding: 0.6rem 0.7rem;
-    text-align: center;
-  }
+  .r-month-badge { display:inline-block; margin-top:0.6rem; background:#1c1c28; color:#faf8f3; font-size:0.72rem; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; padding:0.35rem 1.2rem; border-radius:2px; }
+  .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.6rem; margin-bottom:1.1rem; }
+  .summary-card { border-radius:4px; padding:0.6rem 0.7rem; text-align:center; }
   .summary-card .sc-lbl { font-size:0.55rem; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.2rem; }
   .summary-card .sc-val { font-size:0.82rem; font-weight:800; }
   .summary-card .sc-sub { font-size:0.57rem; margin-top:0.1rem; opacity:0.75; }
-
-  /* Section heading */
-  .r-sec {
-    font-size:0.55rem; letter-spacing:0.22em; text-transform:uppercase; color:#c0b8ac;
-    margin:0.9rem 0 0.4rem; padding-bottom:0.22rem; border-bottom:1px solid #e8e4da;
-  }
-
-  /* Order table */
+  .r-sec { font-size:0.55rem; letter-spacing:0.22em; text-transform:uppercase; color:#c0b8ac; margin:0.9rem 0 0.4rem; padding-bottom:0.22rem; border-bottom:1px solid #e8e4da; }
   .order-table { width:100%; border-collapse:collapse; font-size:0.66rem; }
-  .order-table th {
-    background:#1c1c28; color:#faf8f3; padding:0.4rem 0.75rem;
-    font-size:0.57rem; letter-spacing:0.14em; text-transform:uppercase;
-    text-align:left; font-weight:700;
-  }
-  .order-table th:last-child, .order-table th:nth-child(4) { text-align:right; }
-
-  /* Totals */
-  .totals-block { margin-top:0.8rem; border-top:2px solid #1c1c1c; padding-top:0.6rem; }
-  .total-row {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:0.28rem 0; font-size:0.74rem; gap:0.5rem;
-  }
-  .total-row.grand { font-size:0.88rem; font-weight:800; color:#1c1c1c; padding-top:0.4rem;
-    border-top:1px dashed #ddd8ce; margin-top:0.3rem; }
+  .order-table th { background:#1c1c28; color:#faf8f3; padding:0.4rem 0.75rem; font-size:0.57rem; letter-spacing:0.14em; text-transform:uppercase; text-align:left; font-weight:700; }
+  .order-table th:last-child,.order-table th:nth-child(4) { text-align:right; }
+  .totals-block { margin-top:0.8rem; border-top:2px solid #1c1c28; padding-top:0.6rem; }
+  .total-row { display:flex; justify-content:space-between; align-items:center; padding:0.28rem 0; font-size:0.74rem; gap:0.5rem; }
+  .total-row.grand { font-size:0.88rem; font-weight:800; color:#1c1c1c; padding-top:0.4rem; border-top:1px dashed #ddd8ce; margin-top:0.3rem; }
   .total-row.received { color:#1a6b3c; font-weight:700; }
   .total-row.outstanding { font-weight:700; }
   .tl { flex:1; letter-spacing:0.04em; }
   .tr { white-space:nowrap; }
-
-  /* Collection rate bar */
   .rate-section { margin-top:0.9rem; }
   .rate-label-row { display:flex; justify-content:space-between; font-size:0.62rem; color:#888; margin-bottom:0.3rem; }
   .rate-bar-bg { background:#e8e4da; border-radius:3px; height:8px; overflow:hidden; }
-  .rate-bar-fill { height:100%; border-radius:3px; transition:width 0.4s; }
-
-  /* Status summary pills */
+  .rate-bar-fill { height:100%; border-radius:3px; }
   .status-pills { display:flex; gap:0.5rem; justify-content:center; margin-top:0.9rem; flex-wrap:wrap; }
-  .s-pill {
-    display:inline-flex; align-items:center; gap:0.35rem;
-    padding:0.3rem 0.75rem; border-radius:20px; font-size:0.66rem; font-weight:700;
-    letter-spacing:0.04em;
-  }
-
-  /* Barcode */
-  .barcode-row { display:flex; justify-content:center; align-items:flex-end; gap:1px;
-    height:34px; padding:0 0.5rem; overflow:hidden; margin-top:1rem; }
+  .s-pill { display:inline-flex; align-items:center; gap:0.35rem; padding:0.3rem 0.75rem; border-radius:20px; font-size:0.66rem; font-weight:700; letter-spacing:0.04em; }
+  .barcode-row { display:flex; justify-content:center; align-items:flex-end; gap:1px; height:34px; padding:0 0.5rem; overflow:hidden; margin-top:1rem; }
   .ref-code { text-align:center; font-size:0.55rem; color:#c0b8ac; letter-spacing:0.22em; margin:0.18rem 0 0.6rem; }
-
-  /* Footer */
-  .r-footer { text-align:center; font-size:0.57rem; color:#ccc8be; line-height:1.9;
-    padding-top:0.6rem; border-top:1px dashed #ddd8ce; }
-
-  /* Print actions */
+  .r-footer { text-align:center; font-size:0.57rem; color:#ccc8be; line-height:1.9; padding-top:0.6rem; border-top:1px dashed #ddd8ce; }
   .print-actions { display:flex; gap:0.75rem; justify-content:center; margin-top:1.5rem; }
-  .btn { display:inline-flex; align-items:center; gap:0.45rem; padding:0.6rem 1.6rem;
-    border-radius:7px; font-family:'Space Mono',monospace; font-size:0.78rem; font-weight:700;
-    letter-spacing:0.06em; cursor:pointer; border:none; transition:opacity 0.15s; }
+  .btn { display:inline-flex; align-items:center; gap:0.45rem; padding:0.6rem 1.6rem; border-radius:7px; font-family:'Space Mono',monospace; font-size:0.78rem; font-weight:700; letter-spacing:0.06em; cursor:pointer; border:none; transition:opacity 0.15s; }
   .btn:hover { opacity:0.85; }
   .btn-print { background:#faf8f3; color:#1c1c28; }
   .btn-close { background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); border:1px solid rgba(255,255,255,0.15); }
-
-  @media print {
-    body { background:white; padding:0; }
-    .page-title, .print-actions { display:none !important; }
-    .receipt-outer { filter:none; max-width:100%; }
-    .tear-top    { background-color:white; background-image:radial-gradient(circle at 10px -2px, white 9px, #faf8f3 9px); }
-    .tear-bottom { background-image:radial-gradient(circle at 10px 20px, white 9px, #faf8f3 9px); }
-  }
+  @media print { body { background:white; padding:0; } .page-title,.print-actions { display:none !important; } .receipt-outer { filter:none; max-width:100%; } .tear-top { background-color:white; background-image:radial-gradient(circle at 10px -2px,white 9px,#faf8f3 9px); } .tear-bottom { background-image:radial-gradient(circle at 10px 20px,white 9px,#faf8f3 9px); } }
 </style>
 </head>
 <body>
-
 <div class="page-title">&#9632; Monthly Payment Statement</div>
-
 <div class="receipt-outer">
   <div class="tear tear-top"></div>
   <div class="receipt-body">
-
-    <!-- Header -->
     <div class="r-header">
       <div class="r-logo-row">
         <div class="r-icon-box">&#9775;</div>
-        <div>
-          <div class="r-brand">Monthly Statement</div>
-          <div class="r-subbrand">Freelance Order System</div>
-        </div>
+        <div><div class="r-brand">Monthly Statement</div><div class="r-subbrand">Freelance Order System</div></div>
       </div>
       <div class="r-month-badge">${monthLabel}</div>
     </div>
-
-    <!-- Summary cards -->
     <div class="summary-grid">
       <div class="summary-card" style="background:#f0ece3;border:1px solid #ddd8ce;">
         <div class="sc-lbl" style="color:#888;">Total Invoiced</div>
@@ -1845,86 +1833,50 @@ export default function PaymentTracker() {
         <div class="sc-sub" style="color:${totalOutstanding > 0 ? '#991b1b' : '#166534'};">${cUnpaid} unpaid, ${cPartial} partial</div>
       </div>
     </div>
-
-    <!-- Collection rate bar -->
     <div class="rate-section">
       <div class="rate-label-row">
         <span>Collection Rate</span>
         <span style="font-weight:700;color:${Number(collectionRate) >= 80 ? '#1a6b3c' : Number(collectionRate) >= 50 ? '#b45309' : '#991b1b'};">${collectionRate}%</span>
       </div>
       <div class="rate-bar-bg">
-        <div class="rate-bar-fill" style="width:${Math.min(100, Number(collectionRate))}%;
-          background:${Number(collectionRate) >= 80 ? '#1a6b3c' : Number(collectionRate) >= 50 ? '#b45309' : '#991b1b'};"></div>
+        <div class="rate-bar-fill" style="width:${Math.min(100, Number(collectionRate))}%;background:${Number(collectionRate) >= 80 ? '#1a6b3c' : Number(collectionRate) >= 50 ? '#b45309' : '#991b1b'};"></div>
       </div>
     </div>
-
-    <!-- Status pills -->
     <div class="status-pills">
       <span class="s-pill" style="background:#d1fae5;color:#1a6b3c;border:1px solid #86efac;">&#10003; ${cPaid} Paid</span>
       <span class="s-pill" style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;">&#9685; ${cPartial} Partial</span>
       <span class="s-pill" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">&#10005; ${cUnpaid} Unpaid</span>
     </div>
-
-    <!-- Order breakdown table -->
     <div class="r-sec" style="margin-top:1.1rem;">Order Breakdown</div>
     <table class="order-table">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Ref</th>
-          <th>Topic</th>
+          <th>Date</th><th>Ref</th><th>Topic</th>
           <th style="text-align:right;">Invoiced</th>
           <th style="text-align:right;">Balance</th>
         </tr>
       </thead>
-      <tbody>
-        ${orderRowsHtml}
-      </tbody>
+      <tbody>${orderRowsHtml}</tbody>
     </table>
-
-    <!-- Grand totals -->
     <div class="totals-block">
-      <div class="total-row grand">
-        <span class="tl">TOTAL INVOICED</span>
-        <span class="tr">${fmtR(totalInvoiced)}</span>
-      </div>
-      <div class="total-row received">
-        <span class="tl">Total Received</span>
-        <span class="tr">${fmtR(totalReceived)}</span>
-      </div>
-      <div class="total-row outstanding" style="color:${totalOutstanding > 0 ? '#991b1b' : '#1a6b3c'};">
-        <span class="tl">Outstanding Balance</span>
-        <span class="tr">${fmtR(totalOutstanding)}</span>
-      </div>
+      <div class="total-row grand"><span class="tl">TOTAL INVOICED</span><span class="tr">${fmtR(totalInvoiced)}</span></div>
+      <div class="total-row received"><span class="tl">Total Received</span><span class="tr">${fmtR(totalReceived)}</span></div>
+      <div class="total-row outstanding" style="color:${totalOutstanding > 0 ? '#991b1b' : '#1a6b3c'};"><span class="tl">Outstanding Balance</span><span class="tr">${fmtR(totalOutstanding)}</span></div>
     </div>
-
-    <!-- Barcode -->
     <div class="barcode-row">${barsHtml}</div>
     <div class="ref-code">STMT &middot; ${monthKey.replace('-', '/')} &middot; ${monthOrders.length} ORDERS</div>
-
-    <!-- Footer -->
-    <div class="r-footer">
-      Generated: ${printDateStr}<br>
-      This is a system-generated monthly statement. Retain for your records.
-    </div>
-
-  </div><!-- /receipt-body -->
+    <div class="r-footer">Generated: ${printDateStr}<br>This is a system-generated monthly statement. Retain for your records.</div>
+  </div>
   <div class="tear tear-bottom"></div>
-</div><!-- /receipt-outer -->
-
+</div>
 <div class="print-actions">
   <button class="btn btn-print" onclick="window.print()">&#9113; Print / Save PDF</button>
   <button class="btn btn-close" onclick="window.close()">&#10005; Close</button>
 </div>
-
-</body>
-</html>`;
+</body></html>`;
 
     const win = window.open('', '_blank', 'width=720,height=960,scrollbars=yes,resizable=yes');
-    if (!win) {
-      showToast('Popup blocked — please allow popups for printing.', 'warn');
-      return;
-    }
+    if (!win) { showToast('Popup blocked — please allow popups for printing.', 'warn'); return; }
     win.document.write(html);
     win.document.close();
   };
@@ -1944,6 +1896,27 @@ export default function PaymentTracker() {
       return { key: k, label };
     });
   }, [projects]);
+
+  // ── Monthly stats for in-app preview ──
+  const monthStats = useMemo(() => {
+    if (filterMonth === 'all') return null;
+    const monthOrders = projects.filter(p => {
+      const d = new Date(p.orderDate);
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return k === filterMonth;
+    });
+    const totalInvoiced    = monthOrders.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
+    const totalReceived    = monthOrders.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
+    const totalOutstanding = monthOrders.reduce((s, p) => s + effectiveBalance(p), 0);
+    const cPaid    = monthOrders.filter(p => effectiveStatus(p) === 'paid').length;
+    const cPartial = monthOrders.filter(p => effectiveStatus(p) === 'partial').length;
+    const cUnpaid  = monthOrders.filter(p => effectiveStatus(p) === 'unpaid').length;
+    const collectionRate = totalInvoiced > 0 ? (totalReceived / totalInvoiced) * 100 : 0;
+    const [yr, mo] = filterMonth.split('-');
+    const monthLabel = new Date(Number(yr), Number(mo) - 1, 1)
+      .toLocaleString('en-KE', { month: 'long', year: 'numeric' });
+    return { monthOrders, totalInvoiced, totalReceived, totalOutstanding, cPaid, cPartial, cUnpaid, collectionRate, monthLabel };
+  }, [projects, filterMonth]);
 
   // ── Sorting ──
   const handleSort = (key) => {
@@ -2005,34 +1978,17 @@ export default function PaymentTracker() {
   const paidGlobalStart = processed.active.length;
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ── STATS — computed entirely from live DB records, never from stored fields ──
+  // ── STATS ─────────────────────────────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const all = projects;
-
-    // Total invoiced: sum of all order amounts
-    const totalInvoiced = all.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-
-    // Total received: sum of all amountPaid values
-    const totalReceived = all.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
-
-    // Outstanding balance: computed per-record as max(0, amount - amountPaid)
-    // This never relies on the stored `balance` field which may be stale/missing
+    const totalInvoiced   = all.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
+    const totalReceived   = all.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
     const totalOutstanding = all.reduce((s, p) => s + effectiveBalance(p), 0);
-
-    // Status counts derived from actual numbers, not stored paymentStatus strings
     const cPaid    = all.filter(p => effectiveStatus(p) === 'paid').length;
     const cPartial = all.filter(p => effectiveStatus(p) === 'partial').length;
     const cUnpaid  = all.filter(p => effectiveStatus(p) === 'unpaid').length;
-
-    return {
-      total:    totalInvoiced,
-      paid:     totalReceived,
-      balance:  totalOutstanding,
-      cPaid,
-      cPartial,
-      cUnpaid,
-    };
+    return { total: totalInvoiced, paid: totalReceived, balance: totalOutstanding, cPaid, cPartial, cUnpaid };
   }, [projects]);
 
   // ── Sparkline data ──
@@ -2079,6 +2035,10 @@ export default function PaymentTracker() {
       default:        return { c: '#991b1b', bg: '#fee2e2', text: 'UNPAID',       mark: '✕' };
     }
   };
+
+  // ── Rate bar color ──
+  const rateColor = (rate) =>
+    rate >= 80 ? '#1a6b3c' : rate >= 50 ? '#b45309' : '#991b1b';
 
   // ── Render ──
   return (
@@ -2196,6 +2156,16 @@ export default function PaymentTracker() {
                   <FaTimesCircle /> Mark All Unpaid
                 </BulkBtn>
 
+                {/* ── NEW: Monthly Statement button in Bulk Panel ── */}
+                <BulkDivider theme={theme} />
+                <BulkBtn
+                  $bg={`${theme.primary}18`} $color={theme.primary} $border={`${theme.primary}33`}
+                  onClick={() => setMonthReceiptOpen(true)} disabled={bulkRunning} whileTap={{ scale: 0.96 }}
+                  title="Preview & print monthly statement"
+                >
+                  <FaFileInvoiceDollar /> Monthly Statement
+                </BulkBtn>
+
                 {bulkProgress && (
                   <BulkProgress theme={theme}>
                     {bulkProgress.done} / {bulkProgress.total} updated…
@@ -2263,6 +2233,19 @@ export default function PaymentTracker() {
             <ActionBtn $color={theme.warning} onClick={openCarryForward} whileTap={{ scale: 0.96 }} theme={theme}>
               <FaForward /> Carry Forward
             </ActionBtn>
+
+            {/* ── NEW: Monthly Statement button in Controls (visible when month is selected) ── */}
+            {filterMonth !== 'all' && (
+              <ActionBtn
+                $color={theme.primary}
+                onClick={() => setMonthReceiptOpen(true)}
+                whileTap={{ scale: 0.96 }}
+                theme={theme}
+                title="Preview & print monthly statement"
+              >
+                <FaCalendarAlt /> Monthly Statement
+              </ActionBtn>
+            )}
 
             {dirtyCount > 0 && (
               <ActionBtn $color={theme.success} onClick={saveAll} whileTap={{ scale: 0.96 }} theme={theme}>
@@ -2403,7 +2386,7 @@ export default function PaymentTracker() {
                               )}
                             </td>
 
-                            {/* Balance — always computed live */}
+                            {/* Balance */}
                             <td style={{
                               color: effBalance > 0 ? theme.warning : theme.success,
                               fontWeight: 600,
@@ -2412,7 +2395,7 @@ export default function PaymentTracker() {
                               {fmt(effBalance)}
                             </td>
 
-                            {/* Status pill — always from effectiveStatus */}
+                            {/* Status pill */}
                             <td>
                               <StatusPill $s={ed.status} theme={theme}>
                                 {statusIcon(ed.status, theme)}
@@ -2565,7 +2548,200 @@ export default function PaymentTracker() {
           )}
         </AnimatePresence>
 
-        {/* ── Receipt Preview Modal ── */}
+        {/* ── Monthly Statement Preview Modal (NEW) ── */}
+        <AnimatePresence>
+          {monthReceiptOpen && monthStats && (() => {
+            const { monthOrders, totalInvoiced, totalReceived, totalOutstanding,
+                    cPaid, cPartial, cUnpaid, collectionRate, monthLabel } = monthStats;
+            const rc = rateColor(collectionRate);
+            const bars = genBars(filterMonth);
+
+            // Top 5 orders by amount for the preview table
+            const previewOrders = [...monthOrders]
+              .sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0))
+              .slice(0, 8);
+
+            return (
+              <ReceiptOverlay
+                key="month-receipt-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setMonthReceiptOpen(false)}
+              >
+                <MonthReceiptWrapper
+                  initial={{ scale: 0.88, opacity: 0, y: 28 }}
+                  animate={{ scale: 1,    opacity: 1, y: 0  }}
+                  exit={{ scale: 0.88,    opacity: 0, y: 20 }}
+                  transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <ReceiptPreviewLabel>Monthly Statement — Esc to close</ReceiptPreviewLabel>
+
+                  <ReceiptCard>
+                    <ReceiptTear />
+
+                    <ReceiptBody style={{ padding: '1.4rem 1.6rem 1rem' }}>
+                      {/* Header */}
+                      <ReceiptHeaderSec>
+                        <ReceiptLogoRow>
+                          <ReceiptLogoIcon><FaCalendarAlt /></ReceiptLogoIcon>
+                          <div>
+                            <ReceiptBrandName>Monthly Statement</ReceiptBrandName>
+                            <ReceiptSubBrand>Freelance Order System</ReceiptSubBrand>
+                          </div>
+                        </ReceiptLogoRow>
+                        <div style={{
+                          display: 'inline-block', marginTop: '0.55rem',
+                          background: '#1a1a2e', color: '#fafaf8',
+                          fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em',
+                          textTransform: 'uppercase', padding: '0.3rem 1.1rem',
+                          borderRadius: '2px',
+                        }}>
+                          {monthLabel}
+                        </div>
+                      </ReceiptHeaderSec>
+
+                      {/* Summary cards */}
+                      <MonthSummaryGrid>
+                        <MonthSummaryCard $bg="#f0ece3" $border="#ddd8ce">
+                          <div style={{ fontSize: '0.54rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888', marginBottom: '0.18rem' }}>Total Invoiced</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1c1c1c' }}>{fmt(totalInvoiced)}</div>
+                          <div style={{ fontSize: '0.56rem', color: '#888', marginTop: '0.08rem' }}>{monthOrders.length} orders</div>
+                        </MonthSummaryCard>
+                        <MonthSummaryCard $bg="#d1fae5" $border="#86efac">
+                          <div style={{ fontSize: '0.54rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#166534', marginBottom: '0.18rem' }}>Received</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1a6b3c' }}>{fmt(totalReceived)}</div>
+                          <div style={{ fontSize: '0.56rem', color: '#166534', marginTop: '0.08rem' }}>{cPaid} fully paid</div>
+                        </MonthSummaryCard>
+                        <MonthSummaryCard
+                          $bg={totalOutstanding > 0 ? '#fee2e2' : '#d1fae5'}
+                          $border={totalOutstanding > 0 ? '#fca5a5' : '#86efac'}
+                        >
+                          <div style={{ fontSize: '0.54rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: totalOutstanding > 0 ? '#991b1b' : '#166534', marginBottom: '0.18rem' }}>Outstanding</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: totalOutstanding > 0 ? '#991b1b' : '#1a6b3c' }}>{fmt(totalOutstanding)}</div>
+                          <div style={{ fontSize: '0.56rem', color: totalOutstanding > 0 ? '#991b1b' : '#166534', marginTop: '0.08rem' }}>{cUnpaid} unpaid, {cPartial} partial</div>
+                        </MonthSummaryCard>
+                      </MonthSummaryGrid>
+
+                      {/* Collection rate */}
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#888', marginBottom: '0.25rem' }}>
+                          <span>Collection Rate</span>
+                          <span style={{ fontWeight: 700, color: rc }}>{collectionRate.toFixed(1)}%</span>
+                        </div>
+                        <MonthRateBarBg>
+                          <MonthRateBarFill $pct={Math.min(100, collectionRate)} $c={rc} />
+                        </MonthRateBarBg>
+                      </div>
+
+                      {/* Status pills */}
+                      <MonthStatusPills>
+                        <MonthStatusPill $bg="#d1fae5" $c="#1a6b3c" $border="#86efac">✓ {cPaid} Paid</MonthStatusPill>
+                        <MonthStatusPill $bg="#fef3c7" $c="#b45309" $border="#fcd34d">◑ {cPartial} Partial</MonthStatusPill>
+                        <MonthStatusPill $bg="#fee2e2" $c="#991b1b" $border="#fca5a5">✕ {cUnpaid} Unpaid</MonthStatusPill>
+                      </MonthStatusPills>
+
+                      {/* Order breakdown (preview, capped at 8) */}
+                      <ReceiptSectionHead>
+                        Order Breakdown {monthOrders.length > 8 ? `(top 8 of ${monthOrders.length})` : `(${monthOrders.length} orders)`}
+                      </ReceiptSectionHead>
+
+                      <MonthOrderTable>
+                        <thead>
+                          <tr>
+                            <th style={{ width: '60px' }}>Date</th>
+                            <th style={{ width: '80px' }}>Ref</th>
+                            <th>Topic</th>
+                            <th style={{ width: '110px', textAlign: 'right' }}>Invoiced</th>
+                            <th style={{ width: '100px', textAlign: 'right' }}>Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewOrders.map((p, i) => {
+                            const effS = effectiveStatus(p);
+                            const bal  = effectiveBalance(p);
+                            const statusC = effS === 'paid' ? '#1a6b3c' : effS === 'partial' ? '#b45309' : '#991b1b';
+                            return (
+                              <tr key={p.id} style={{ background: i % 2 === 0 ? '#fafaf8' : '#f5f2eb' }}>
+                                <td style={{ color: '#888', fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
+                                  {p.orderDate ? new Date(p.orderDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' }) : '—'}
+                                </td>
+                                <td style={{ color: '#1a6b3c', fontWeight: 700, fontSize: '0.62rem' }}>
+                                  {p.orderRefCode || '—'}
+                                </td>
+                                <td style={{ fontSize: '0.62rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {p.topic || 'No topic'}
+                                  {p.isCarryForward && <span style={{ fontSize: '0.55rem', color: '#92400e', background: '#fef3c7', padding: '0 3px', borderRadius: '3px', marginLeft: '3px' }}>CF</span>}
+                                </td>
+                                <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
+                                  {fmt(p.amount)}
+                                </td>
+                                <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.62rem', color: statusC, whiteSpace: 'nowrap' }}>
+                                  {effS === 'paid' ? '✓ Settled' : fmt(bal)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </MonthOrderTable>
+
+                      {/* Totals */}
+                      <ReceiptDividerLine $dashed style={{ margin: '0.75rem 0 0.4rem' }} />
+                      <ReceiptTotalRow $big>
+                        <span className="tl">TOTAL INVOICED</span>
+                        <span className="tr">{fmt(totalInvoiced)}</span>
+                      </ReceiptTotalRow>
+                      <ReceiptTotalRow $color="#166534">
+                        <span className="tl">Total Received</span>
+                        <span className="tr">{fmt(totalReceived)}</span>
+                      </ReceiptTotalRow>
+                      <ReceiptTotalRow $color={totalOutstanding > 0 ? '#991b1b' : '#166534'}>
+                        <span className="tl">Outstanding Balance</span>
+                        <span className="tr">{fmt(totalOutstanding)}</span>
+                      </ReceiptTotalRow>
+
+                      {/* Barcode */}
+                      <ReceiptBarcodeRow>
+                        {bars.map((b, i) => (
+                          <div key={i} style={{ background: '#2a2a2a', width: `${b.w}px`, height: `${b.h}px`, flexShrink: 0 }} />
+                        ))}
+                      </ReceiptBarcodeRow>
+                      <ReceiptRefCode>STMT · {filterMonth.replace('-', '/')} · {monthOrders.length} ORDERS</ReceiptRefCode>
+
+                      <ReceiptFooter>
+                        Generated: {new Date().toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}<br />
+                        System-generated monthly statement — retain for your records.
+                      </ReceiptFooter>
+                    </ReceiptBody>
+
+                    <ReceiptTear $bottom />
+                  </ReceiptCard>
+
+                  <ReceiptActionsBar>
+                    <ReceiptActionBtn
+                      $primary
+                      onClick={() => { printMonthlyReceipt(filterMonth); }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.96 }}
+                    >
+                      <FaPrint /> Print / Save PDF
+                    </ReceiptActionBtn>
+                    <ReceiptActionBtn
+                      onClick={() => setMonthReceiptOpen(false)}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.96 }}
+                    >
+                      <FaTimes /> Close
+                    </ReceiptActionBtn>
+                  </ReceiptActionsBar>
+                </MonthReceiptWrapper>
+              </ReceiptOverlay>
+            );
+          })()}
+        </AnimatePresence>
+
+        {/* ── Receipt Preview Modal (single order) ── */}
         <AnimatePresence>
           {receiptProject && (() => {
             const p        = receiptProject;
