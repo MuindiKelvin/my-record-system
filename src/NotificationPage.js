@@ -7,133 +7,225 @@ import {
   FaFilter, FaCheckDouble, FaExclamationTriangle, FaClock,
   FaHourglassHalf, FaSync
 } from 'react-icons/fa';
-import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 
-const StyledCard = styled(motion.div)`
-  border-radius: 15px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-`;
+const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
 
-const FilterBadge = styled.button`
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 2px solid ${props => props.active ? props.color : '#dee2e6'};
-  background: ${props => props.active ? props.color : 'transparent'};
-  color: ${props => props.active ? '#fff' : '#6c757d'};
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-right: 8px;
-  margin-bottom: 8px;
+// ── Primitives ────────────────────────────────────────────────────────────────
 
-  &:hover {
-    background: ${props => props.color};
-    color: #fff;
-    border-color: ${props => props.color};
-    transform: translateY(-2px);
-  }
-`;
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700,
+      letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6c757d',
+      borderBottom: '1px solid #dee2e6', paddingBottom: '0.4rem', marginBottom: '0.85rem',
+    }}>{children}</div>
+  );
+}
 
-const NotificationBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  gap: 4px;
-`;
+function Divider() {
+  return <div style={{ height: '1px', background: '#dee2e6', margin: '0.85rem 0' }} />;
+}
 
-const ActionButton = styled(motion.button)`
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
+function FL({ children }) {
+  return (
+    <label style={{
+      display: 'block', fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700,
+      letterSpacing: '0.08em', textTransform: 'uppercase', color: '#495057',
+      marginBottom: '0.35rem',
+    }}>{children}</label>
+  );
+}
 
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
+const inputBase = {
+  fontFamily: MONO, fontSize: '0.82rem',
+  background: '#fff', border: '1px solid #ced4da', borderRadius: '4px',
+  color: '#212529', padding: '0.42rem 0.75rem', outline: 'none',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+};
 
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-`;
+function FS({ style, children, ...p }) {
+  return (
+    <select
+      style={{
+        ...inputBase,
+        appearance: 'none', cursor: 'pointer', paddingRight: '2rem',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236c757d' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', ...style,
+      }}
+      onFocus={e => { e.target.style.borderColor = '#86b7fe'; e.target.style.boxShadow = '0 0 0 3px rgba(13,110,253,0.15)'; }}
+      onBlur={e => { e.target.style.borderColor = '#ced4da'; e.target.style.boxShadow = 'none'; }}
+      {...p}
+    >{children}</select>
+  );
+}
 
-// A project is "settled" when it no longer needs any alert.
-// This is the single source of truth used for both creation and deletion decisions.
+// ── Alert type logic ───────────────────────────────────────────────────────────
+
 const computeAlertType = (project, currentDate) => {
   const submissionDate = new Date(project.submissionDate);
   const timeDiff = submissionDate - currentDate;
   const daysDiff = Math.round(timeDiff / (1000 * 3600 * 24));
 
-  const settled =
-    project.status === 'completed' ||
-    project.status === 'cancelled';
-
+  const settled = project.status === 'completed' || project.status === 'cancelled';
   if (settled) return null;
 
-  const isOverdue       = daysDiff < 0;
-  const isUrgent        = daysDiff <= 1 && daysDiff >= 0;
-  const isDueSoon       = daysDiff <= 2 && daysDiff > 1;
-  const isPendingLong   = project.status === 'pending' &&
+  const isOverdue        = daysDiff < 0;
+  const isUrgent         = daysDiff <= 1 && daysDiff >= 0;
+  const isDueSoon        = daysDiff <= 2 && daysDiff > 1;
+  const isPendingLong    = project.status === 'pending' &&
     (currentDate - new Date(project.orderDate)) / (1000 * 3600 * 24) > 7;
   const isInProgressLong = project.status === 'in-progress' &&
     (currentDate - new Date(project.lastUpdated || project.orderDate)) / (1000 * 3600 * 24) > 14;
 
-  if (isOverdue)        return 'overdue';
-  if (isUrgent)         return 'urgent';
-  if (isDueSoon)        return 'due-soon';
-  if (isPendingLong)    return 'pending-long';
-  if (isInProgressLong) return 'in-progress-long';
-
-  return null; // no alert needed
+  if (isOverdue)         return 'overdue';
+  if (isUrgent)          return 'urgent';
+  if (isDueSoon)         return 'due-soon';
+  if (isPendingLong)     return 'pending-long';
+  if (isInProgressLong)  return 'in-progress-long';
+  return null;
 };
+
+// ── Type config ────────────────────────────────────────────────────────────────
+
+const TYPE_CONFIG = {
+  'overdue':          { color: '#dc3545', bg: '#f8d7da', border: '#f5c2c7', icon: FaExclamationTriangle, label: 'Overdue'          },
+  'urgent':           { color: '#856404', bg: '#fff3cd', border: '#ffda6a', icon: FaClock,               label: 'Urgent'           },
+  'due-soon':         { color: '#055160', bg: '#cff4fc', border: '#9eeaf9', icon: FaClock,               label: 'Due Soon'         },
+  'pending-long':     { color: '#495057', bg: '#e9ecef', border: '#ced4da', icon: FaHourglassHalf,       label: 'Long Pending'     },
+  'in-progress-long': { color: '#084298', bg: '#cfe2ff', border: '#9ec5fe', icon: FaSync,                label: 'Long In Progress' },
+};
+
+const getTypeConfig = (type) => TYPE_CONFIG[type] || TYPE_CONFIG['due-soon'];
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function TypeBadge({ type }) {
+  const cfg = getTypeConfig(type);
+  const Icon = cfg.icon;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+      fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700,
+      letterSpacing: '0.06em', textTransform: 'uppercase',
+      color: cfg.color, background: cfg.bg,
+      border: `1px solid ${cfg.border}`,
+      borderRadius: '4px', padding: '0.22rem 0.55rem',
+    }}>
+      <Icon size={10} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    completed:    { color: '#0f5132', bg: '#d1e7dd', border: '#a3cfbb' },
+    'in-progress':{ color: '#664d03', bg: '#fff3cd', border: '#ffda6a' },
+    cancelled:    { color: '#842029', bg: '#f8d7da', border: '#f5c2c7' },
+    pending:      { color: '#495057', bg: '#e9ecef', border: '#ced4da' },
+  };
+  const s = map[status] || map.pending;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700,
+      letterSpacing: '0.06em', textTransform: 'uppercase',
+      color: s.color, background: s.bg, border: `1px solid ${s.border}`,
+      borderRadius: '4px', padding: '0.22rem 0.55rem',
+    }}>
+      {status}
+    </span>
+  );
+}
+
+function FilterPill({ active, color, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        fontFamily: MONO, fontSize: '0.72rem', fontWeight: active ? 700 : 500,
+        letterSpacing: '0.04em',
+        padding: '0.3rem 0.85rem', borderRadius: '20px',
+        border: `2px solid ${active || hovered ? color : '#dee2e6'}`,
+        background: active ? color : hovered ? color + '18' : 'transparent',
+        color: active ? '#fff' : hovered ? color : '#6c757d',
+        cursor: 'pointer', transition: 'all 0.2s',
+        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+        marginRight: '0.4rem', marginBottom: '0.4rem',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconBtn({ onClick, title, variant = 'secondary', children }) {
+  const colors = {
+    primary:   { bg: '#0d6efd', hover: '#0b5ed7', text: '#fff' },
+    success:   { bg: '#198754', hover: '#157347', text: '#fff' },
+    danger:    { bg: '#dc3545', hover: '#bb2d3b', text: '#fff' },
+    secondary: { bg: '#6c757d', hover: '#5c636a', text: '#fff' },
+    warning:   { bg: '#ffc107', hover: '#ffca2c', text: '#212529' },
+    light:     { bg: '#f8f9fa', hover: '#e9ecef', text: '#212529' },
+  };
+  const c = colors[variant] || colors.secondary;
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        fontFamily: MONO, fontSize: '0.75rem', fontWeight: 600,
+        letterSpacing: '0.03em',
+        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+        padding: '0.38rem 0.75rem', borderRadius: '4px', border: 'none',
+        background: hovered ? c.hover : c.bg, color: c.text,
+        cursor: 'pointer', transition: 'background 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 function NotificationPage() {
   const navigate = useNavigate();
-  const [notifications, setNotifications]           = useState([]);
+  const [notifications, setNotifications]               = useState([]);
   const [selectedNotifications, setSelectedNotifications] = useState([]);
-  const [isLoading, setIsLoading]                   = useState(true);
-  const [error, setError]                           = useState('');
-  const [filterType, setFilterType]                 = useState('all');
-  const [filterRead, setFilterRead]                 = useState('all');
-
-  const [currentPage, setCurrentPage]   = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isLoading, setIsLoading]                       = useState(true);
+  const [error, setError]                               = useState('');
+  const [filterType, setFilterType]                     = useState('all');
+  const [filterRead, setFilterRead]                     = useState('all');
+  const [currentPage, setCurrentPage]                   = useState(1);
+  const [itemsPerPage, setItemsPerPage]                 = useState(10);
   const pageSizeOptions = [5, 10, 20, 50];
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchNotifications = async () => {
     setIsLoading(true);
     try {
       const currentDate = new Date();
-
-      // Load projects and existing notification documents in parallel
       const [projectsSnapshot, notificationsSnapshot] = await Promise.all([
         getDocs(collection(db, 'projects')),
-        getDocs(collection(db, 'notifications'))
+        getDocs(collection(db, 'notifications')),
       ]);
 
       const projectsData = projectsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Build a map of projectId -> notification doc for O(1) lookup
-      const existingMap = {};
+      const existingMap  = {};
       notificationsSnapshot.docs.forEach(d => {
         const data = d.data();
         if (data.projectId) existingMap[data.projectId] = { id: d.id, ...data };
       });
 
-      // Track which notification doc IDs are still valid after this pass
       const validNotifIds = new Set();
 
       const notificationList = await Promise.all(
@@ -141,20 +233,14 @@ function NotificationPage() {
           const alertType = computeAlertType(project, currentDate);
           const existing  = existingMap[project.id];
 
-          // Project is settled or needs no alert: delete its notification if one exists
           if (!alertType) {
-            if (existing) {
-              await deleteDoc(doc(db, 'notifications', existing.id));
-            }
+            if (existing) await deleteDoc(doc(db, 'notifications', existing.id));
             return null;
           }
 
-          // Project needs an alert
           if (!existing) {
-            // Create a fresh notification document
             const submissionDate = new Date(project.submissionDate);
             const daysDiff = Math.round((submissionDate - currentDate) / (1000 * 3600 * 24));
-
             const newNotif = {
               projectId:      project.id,
               title:          project.topic || 'Untitled Project',
@@ -165,7 +251,7 @@ function NotificationPage() {
               isViewed:       false,
               type:           alertType,
               daysUntilDue:   daysDiff,
-              createdAt:      new Date().toISOString()
+              createdAt:      new Date().toISOString(),
             };
             const docRef = await addDoc(collection(db, 'notifications'), newNotif);
             const created = { id: docRef.id, ...newNotif };
@@ -173,17 +259,14 @@ function NotificationPage() {
             return created;
           }
 
-          // Existing notification — keep it, update type if it has changed
           validNotifIds.add(existing.id);
           const submissionDate = new Date(project.submissionDate);
           const daysDiff = Math.round((submissionDate - currentDate) / (1000 * 3600 * 24));
 
           if (existing.type !== alertType || existing.status !== project.status) {
             await updateDoc(doc(db, 'notifications', existing.id), {
-              type:         alertType,
-              status:       project.status,
-              daysUntilDue: daysDiff,
-              lastUpdated:  new Date().toISOString()
+              type: alertType, status: project.status,
+              daysUntilDue: daysDiff, lastUpdated: new Date().toISOString(),
             });
           }
 
@@ -199,21 +282,14 @@ function NotificationPage() {
             type:           alertType,
             daysUntilDue:   daysDiff,
             isDue:          ['overdue', 'urgent', 'due-soon'].includes(alertType),
-            createdAt:      existing.createdAt || new Date().toISOString()
+            createdAt:      existing.createdAt || new Date().toISOString(),
           };
         })
       );
 
-      // Also delete any notification docs whose projectId no longer maps to any project
-      // (handles the case where a project was deleted from Firestore entirely)
       const orphanDeletions = notificationsSnapshot.docs
-        .filter(d => {
-          const data = d.data();
-          // It has a projectId but it's not in our valid set and wasn't already deleted above
-          return data.projectId && !validNotifIds.has(d.id);
-        })
+        .filter(d => d.data().projectId && !validNotifIds.has(d.id))
         .map(d => deleteDoc(doc(db, 'notifications', d.id)));
-
       await Promise.all(orphanDeletions);
 
       const result = notificationList
@@ -232,7 +308,7 @@ function NotificationPage() {
     }
   };
 
-  //  Filters 
+  // ── Filters & pagination ───────────────────────────────────────────────────
 
   const filteredNotifications = notifications.filter(notif => {
     const typeMatch = filterType === 'all' || notif.type === filterType;
@@ -243,27 +319,27 @@ function NotificationPage() {
     return typeMatch && readMatch;
   });
 
-  const indexOfLastItem  = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentNotifications = filteredNotifications.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
+  const indexOfLastItem       = currentPage * itemsPerPage;
+  const indexOfFirstItem      = indexOfLastItem - itemsPerPage;
+  const currentNotifications  = filteredNotifications.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages            = Math.ceil(filteredNotifications.length / itemsPerPage);
 
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const paginate = (page) => setCurrentPage(page);
 
   const handleItemsPerPageChange = (newSize) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);
   };
 
-  //  Selection helpers 
+  // ── Selection ──────────────────────────────────────────────────────────────
 
-  const toggleNotificationSelection = (id) => {
+  const toggleSelection = (id) => {
     setSelectedNotifications(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
-  const toggleAllCurrentPageSelections = () => {
+  const toggleAllCurrentPage = () => {
     const ids = currentNotifications.map(n => n.id);
     const allSelected = ids.every(id => selectedNotifications.includes(id));
     if (allSelected) {
@@ -273,23 +349,16 @@ function NotificationPage() {
     }
   };
 
-  //  Bulk actions 
+  // ── Bulk actions ───────────────────────────────────────────────────────────
 
   const bulkToggleRead = async (markAsRead) => {
     try {
       const valid = selectedNotifications.filter(id => notifications.some(n => n.id === id));
-      if (valid.length === 0) return;
-
+      if (!valid.length) return;
       await Promise.all(valid.map(id =>
-        updateDoc(doc(db, 'notifications', id), {
-          isRead: markAsRead,
-          lastUpdated: new Date().toISOString()
-        })
+        updateDoc(doc(db, 'notifications', id), { isRead: markAsRead, lastUpdated: new Date().toISOString() })
       ));
-
-      setNotifications(prev =>
-        prev.map(n => valid.includes(n.id) ? { ...n, isRead: markAsRead } : n)
-      );
+      setNotifications(prev => prev.map(n => valid.includes(n.id) ? { ...n, isRead: markAsRead } : n));
       setSelectedNotifications([]);
     } catch (err) {
       setError(`Error updating notifications: ${err.message}`);
@@ -301,10 +370,8 @@ function NotificationPage() {
     if (!window.confirm(`Delete ${selectedNotifications.length} notification(s)?`)) return;
     try {
       const valid = selectedNotifications.filter(id => notifications.some(n => n.id === id));
-      if (valid.length === 0) return;
-
+      if (!valid.length) return;
       await Promise.all(valid.map(id => deleteDoc(doc(db, 'notifications', id))));
-
       setNotifications(prev => prev.filter(n => !valid.includes(n.id)));
       setSelectedNotifications([]);
     } catch (err) {
@@ -316,15 +383,10 @@ function NotificationPage() {
   const markAllAsRead = async () => {
     try {
       const unread = filteredNotifications.filter(n => !n.isRead);
-      if (unread.length === 0) return;
-
+      if (!unread.length) return;
       await Promise.all(unread.map(n =>
-        updateDoc(doc(db, 'notifications', n.id), {
-          isRead: true,
-          lastUpdated: new Date().toISOString()
-        })
+        updateDoc(doc(db, 'notifications', n.id), { isRead: true, lastUpdated: new Date().toISOString() })
       ));
-
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (err) {
       setError(`Error marking all read: ${err.message}`);
@@ -332,20 +394,7 @@ function NotificationPage() {
     }
   };
 
-  //  Type config 
-
-  const getNotificationTypeConfig = (type) => {
-    const configs = {
-      'overdue':          { color: '#dc3545', icon: FaExclamationTriangle, label: 'Overdue',           bgClass: 'table-danger'    },
-      'urgent':           { color: '#ffc107', icon: FaClock,               label: 'Urgent',            bgClass: 'table-warning'   },
-      'due-soon':         { color: '#0dcaf0', icon: FaClock,               label: 'Due Soon',          bgClass: 'table-info'      },
-      'pending-long':     { color: '#6c757d', icon: FaHourglassHalf,       label: 'Long Pending',      bgClass: 'table-secondary' },
-      'in-progress-long': { color: '#0d6efd', icon: FaSync,                label: 'Long In Progress',  bgClass: 'table-primary'   },
-    };
-    return configs[type] || configs['due-soon'];
-  };
-
-  // Lifecycle 
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchNotifications();
@@ -355,314 +404,451 @@ function NotificationPage() {
 
   useEffect(() => { setCurrentPage(1); }, [filterType, filterRead]);
 
-  //  Derived counts 
+  // ── Derived counts ─────────────────────────────────────────────────────────
 
   const unreadCount   = notifications.filter(n => !n.isRead).length;
   const selectedCount = selectedNotifications.length;
   const typeCounts    = {
-    all:              notifications.length,
-    overdue:          notifications.filter(n => n.type === 'overdue').length,
-    urgent:           notifications.filter(n => n.type === 'urgent').length,
-    'due-soon':       notifications.filter(n => n.type === 'due-soon').length,
-    'pending-long':   notifications.filter(n => n.type === 'pending-long').length,
-    'in-progress-long': notifications.filter(n => n.type === 'in-progress-long').length,
+    all:               notifications.length,
+    overdue:           notifications.filter(n => n.type === 'overdue').length,
+    urgent:            notifications.filter(n => n.type === 'urgent').length,
+    'due-soon':        notifications.filter(n => n.type === 'due-soon').length,
+    'pending-long':    notifications.filter(n => n.type === 'pending-long').length,
+    'in-progress-long':notifications.filter(n => n.type === 'in-progress-long').length,
   };
 
-  // Render 
+  // ── Loading state ──────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
-      <div className="d-flex justify-content-center align-items-center min-vh-100">
-        <motion.div
-          className="spinner-border text-primary"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        >
-          <span className="visually-hidden">Loading notifications...</span>
-        </motion.div>
+      <div style={{
+        minHeight: '100vh', background: '#1a1f2e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: '0.75rem',
+      }}>
+        <div style={{
+          width: '2rem', height: '2rem', border: '3px solid rgba(13,110,253,0.25)',
+          borderTopColor: '#0d6efd', borderRadius: '50%', animation: 'spin 0.7s linear infinite',
+        }} />
+        <p style={{ fontFamily: MONO, fontSize: '0.75rem', color: '#6c757d', margin: 0 }}>
+          Loading notifications…
+        </p>
       </div>
     );
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="container-fluid py-4">
-      <StyledCard
-        className="card shadow-lg"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="card-header bg-gradient bg-primary text-white">
-          <div className="d-flex justify-content-between align-items-center flex-wrap">
-            <div className="d-flex align-items-center mb-2 mb-md-0">
-              <h2 className="h4 mb-0 me-3">
-                <FaBell className="me-2" /> Notifications
-              </h2>
-              <span className="badge bg-light text-primary" style={{ fontSize: '0.9rem' }}>
-                {unreadCount} Unread / {notifications.length} Total
-              </span>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              <button
-                className="btn btn-light btn-sm"
-                onClick={fetchNotifications}
-                title="Refresh notifications"
-              >
-                <FaSync className="me-1" /> Refresh
-              </button>
-              {unreadCount > 0 && (
-                <button
-                  className="btn btn-light btn-sm"
-                  onClick={markAllAsRead}
-                  title="Mark all as read"
-                >
-                  <FaCheckDouble className="me-1" /> Mark All Read
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
+        @keyframes fadeIn  { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin    { to { transform: rotate(360deg); } }
+        .notif-row:hover { background: #f0f4ff !important; }
+        .notif-row-selected { background: #e7f0ff !important; }
+      `}</style>
 
-        <div className="card-body">
-          {/* Filters */}
-          <div className="mb-4 p-3 bg-light rounded">
-            <div className="row">
-              <div className="col-md-8 mb-3 mb-md-0">
-                <h6 className="mb-2"><FaFilter className="me-2" />Filter by Type:</h6>
-                <div className="d-flex flex-wrap">
-                  <FilterBadge active={filterType === 'all'}              color="#0d6efd" onClick={() => setFilterType('all')}>All ({typeCounts.all})</FilterBadge>
-                  <FilterBadge active={filterType === 'overdue'}          color="#dc3545" onClick={() => setFilterType('overdue')}><FaExclamationTriangle className="me-1" />Overdue ({typeCounts.overdue})</FilterBadge>
-                  <FilterBadge active={filterType === 'urgent'}           color="#ffc107" onClick={() => setFilterType('urgent')}><FaClock className="me-1" />Urgent ({typeCounts.urgent})</FilterBadge>
-                  <FilterBadge active={filterType === 'due-soon'}         color="#0dcaf0" onClick={() => setFilterType('due-soon')}><FaClock className="me-1" />Due Soon ({typeCounts['due-soon']})</FilterBadge>
-                  <FilterBadge active={filterType === 'pending-long'}     color="#6c757d" onClick={() => setFilterType('pending-long')}><FaHourglassHalf className="me-1" />Long Pending ({typeCounts['pending-long']})</FilterBadge>
-                  <FilterBadge active={filterType === 'in-progress-long'} color="#0d6efd" onClick={() => setFilterType('in-progress-long')}><FaSync className="me-1" />Long In Progress ({typeCounts['in-progress-long']})</FilterBadge>
+      <div style={{ minHeight: '100vh', background: '#1a1f2e', padding: '1.25rem 1.5rem', fontFamily: MONO }}>
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+
+          {/* ── Main Card ── */}
+          <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+
+            {/* Card Header */}
+            <div style={{ background: '#0d6efd', padding: '0.85rem 1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <h2 style={{ fontFamily: MONO, fontSize: '1.15rem', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaBell size={16} /> Notifications
+                  </h2>
+                  <span style={{
+                    fontFamily: MONO, fontSize: '0.72rem', fontWeight: 600,
+                    background: 'rgba(255,255,255,0.2)', color: '#fff',
+                    borderRadius: '4px', padding: '0.2rem 0.55rem', letterSpacing: '0.04em',
+                  }}>
+                    {unreadCount} unread / {notifications.length} total
+                  </span>
                 </div>
-              </div>
-              <div className="col-md-4">
-                <h6 className="mb-2">Filter by Status:</h6>
-                <div className="d-flex gap-2">
-                  <button className={`btn btn-sm ${filterRead === 'all'    ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilterRead('all')}>All</button>
-                  <button className={`btn btn-sm ${filterRead === 'unread' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilterRead('unread')}>Unread</button>
-                  <button className={`btn btn-sm ${filterRead === 'read'   ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilterRead('read')}>Read</button>
-                </div>
-                <div className="mt-2">
-                  <label className="text-muted small me-2">Show:</label>
-                  <select
-                    className="form-select form-select-sm d-inline-block w-auto"
-                    value={itemsPerPage}
-                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={fetchNotifications}
+                    style={{
+                      fontFamily: MONO, fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.03em',
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.38rem 0.75rem', borderRadius: '4px', border: 'none',
+                      background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
                   >
-                    {pageSizeOptions.map(size => (
-                      <option key={size} value={size}>{size} per page</option>
-                    ))}
-                  </select>
+                    <FaSync size={12} /> Refresh
+                  </button>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      style={{
+                        fontFamily: MONO, fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.03em',
+                        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.38rem 0.75rem', borderRadius: '4px', border: 'none',
+                        background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    >
+                      <FaCheckDouble size={12} /> Mark All Read
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Bulk actions bar */}
-          {selectedCount > 0 && (
-            <motion.div
-              className="alert alert-info d-flex justify-content-between align-items-center"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <span><strong>{selectedCount}</strong> notification{selectedCount > 1 ? 's' : ''} selected</span>
-              <div className="d-flex gap-2">
-                <ActionButton className="btn btn-sm btn-success" onClick={() => bulkToggleRead(true)}  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaCheck /> Mark Read</ActionButton>
-                <ActionButton className="btn btn-sm btn-warning" onClick={() => bulkToggleRead(false)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaEye /> Mark Unread</ActionButton>
-                <ActionButton className="btn btn-sm btn-danger"  onClick={bulkDeleteNotifications}     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><FaTrash /> Delete</ActionButton>
+            {/* Card Body */}
+            <div style={{ padding: '1.25rem' }}>
+
+              {/* Error */}
+              {error && (
+                <div style={{
+                  fontFamily: MONO, fontSize: '0.8rem',
+                  background: '#f8d7da', border: '1px solid #f5c2c7',
+                  borderRadius: '4px', color: '#842029',
+                  padding: '0.6rem 0.85rem', marginBottom: '1rem',
+                  display: 'flex', gap: '0.45rem', animation: 'slideIn 0.2s ease',
+                }}>
+                  <span>⚠</span><span>{error}</span>
+                </div>
+              )}
+
+              {/* ── Filters ── */}
+              <SectionLabel><FaFilter style={{ marginRight: '0.4rem' }} />Filters</SectionLabel>
+              <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.85rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'start' }}>
+
+                  {/* Type filters */}
+                  <div>
+                    <div style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6c757d', marginBottom: '0.5rem' }}>Filter by Type</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                      <FilterPill active={filterType === 'all'}               color="#0d6efd" onClick={() => setFilterType('all')}>All ({typeCounts.all})</FilterPill>
+                      <FilterPill active={filterType === 'overdue'}           color="#dc3545" onClick={() => setFilterType('overdue')}><FaExclamationTriangle size={10} />Overdue ({typeCounts.overdue})</FilterPill>
+                      <FilterPill active={filterType === 'urgent'}            color="#856404" onClick={() => setFilterType('urgent')}><FaClock size={10} />Urgent ({typeCounts.urgent})</FilterPill>
+                      <FilterPill active={filterType === 'due-soon'}          color="#055160" onClick={() => setFilterType('due-soon')}><FaClock size={10} />Due Soon ({typeCounts['due-soon']})</FilterPill>
+                      <FilterPill active={filterType === 'pending-long'}      color="#495057" onClick={() => setFilterType('pending-long')}><FaHourglassHalf size={10} />Long Pending ({typeCounts['pending-long']})</FilterPill>
+                      <FilterPill active={filterType === 'in-progress-long'}  color="#084298" onClick={() => setFilterType('in-progress-long')}><FaSync size={10} />Long In Progress ({typeCounts['in-progress-long']})</FilterPill>
+                    </div>
+                  </div>
+
+                  {/* Read status + page size */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: '160px' }}>
+                    <div>
+                      <div style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6c757d', marginBottom: '0.4rem' }}>Read Status</div>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        {['all', 'unread', 'read'].map(v => (
+                          <button key={v} onClick={() => setFilterRead(v)}
+                            style={{
+                              fontFamily: MONO, fontSize: '0.72rem', fontWeight: filterRead === v ? 700 : 500,
+                              padding: '0.28rem 0.65rem', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                              background: filterRead === v ? '#0d6efd' : '#e9ecef',
+                              color: filterRead === v ? '#fff' : '#495057',
+                              transition: 'all 0.15s', textTransform: 'capitalize',
+                            }}
+                          >{v}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <FL>Per Page</FL>
+                      <FS
+                        value={itemsPerPage}
+                        onChange={e => handleItemsPerPageChange(Number(e.target.value))}
+                        style={{ width: '100%' }}
+                      >
+                        {pageSizeOptions.map(s => <option key={s} value={s}>{s} per page</option>)}
+                      </FS>
+                    </div>
+                  </div>
+
+                </div>
               </div>
-            </motion.div>
-          )}
 
-          {error && (
-            <motion.div className="alert alert-danger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {error}
-            </motion.div>
-          )}
+              {/* ── Bulk Actions Bar ── */}
+              {selectedCount > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    background: '#cfe2ff', border: '1px solid #9ec5fe', borderRadius: '4px',
+                    padding: '0.6rem 0.85rem', marginBottom: '0.85rem',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem',
+                    animation: 'slideIn 0.2s ease',
+                  }}
+                >
+                  <span style={{ fontFamily: MONO, fontSize: '0.78rem', color: '#084298', fontWeight: 600 }}>
+                    {selectedCount} notification{selectedCount > 1 ? 's' : ''} selected
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.45rem' }}>
+                    <IconBtn variant="success" onClick={() => bulkToggleRead(true)}><FaCheck size={11} /> Mark Read</IconBtn>
+                    <IconBtn variant="warning" onClick={() => bulkToggleRead(false)}><FaEye size={11} /> Mark Unread</IconBtn>
+                    <IconBtn variant="danger" onClick={bulkDeleteNotifications}><FaTrash size={11} /> Delete</IconBtn>
+                  </div>
+                </motion.div>
+              )}
 
-          {filteredNotifications.length === 0 ? (
-            <motion.div className="text-center p-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <FaBell size={64} className="text-muted mb-3" />
-              <h5 className="text-muted">No notifications to display</h5>
-              <p className="text-muted">
-                {filterType !== 'all' || filterRead !== 'all'
-                  ? 'Try adjusting your filters'
-                  : "You're all caught up!"}
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              <div className="table-responsive">
-                <table className="table table-hover align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th style={{ width: '40px' }}>
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          checked={
-                            currentNotifications.length > 0 &&
-                            currentNotifications.every(n => selectedNotifications.includes(n.id))
-                          }
-                          onChange={toggleAllCurrentPageSelections}
-                        />
-                      </th>
-                      <th style={{ width: '50px' }}>#</th>
-                      <th>Project</th>
-                      <th>Reference</th>
-                      <th>Submission Date</th>
-                      <th>Status</th>
-                      <th>Type</th>
-                      <th>Due</th>
-                      <th style={{ width: '120px' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence>
-                      {currentNotifications.map((notif, index) => {
-                        const typeConfig = getNotificationTypeConfig(notif.type);
-                        const Icon = typeConfig.icon;
+              {/* ── Empty State ── */}
+              {filteredNotifications.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                  <FaBell size={48} style={{ color: '#dee2e6', marginBottom: '0.85rem' }} />
+                  <p style={{ fontFamily: MONO, fontSize: '0.9rem', fontWeight: 700, color: '#495057', margin: '0 0 0.3rem' }}>
+                    No notifications to display
+                  </p>
+                  <p style={{ fontFamily: MONO, fontSize: '0.75rem', color: '#adb5bd', margin: 0 }}>
+                    {filterType !== 'all' || filterRead !== 'all'
+                      ? 'Try adjusting your filters'
+                      : "You're all caught up!"}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* ── Table ── */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: MONO, fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #dee2e6' }}>
+                          <th style={{ padding: '0.55rem 0.5rem', width: '36px' }}>
+                            <input
+                              type="checkbox"
+                              checked={
+                                currentNotifications.length > 0 &&
+                                currentNotifications.every(n => selectedNotifications.includes(n.id))
+                              }
+                              onChange={toggleAllCurrentPage}
+                              style={{ cursor: 'pointer', accentColor: '#0d6efd' }}
+                            />
+                          </th>
+                          {['#', 'Project', 'Reference', 'Submission', 'Status', 'Alert Type', 'Due', 'Actions'].map(h => (
+                            <th key={h} style={{
+                              padding: '0.55rem 0.65rem', textAlign: 'left',
+                              fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700,
+                              letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6c757d',
+                            }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <AnimatePresence>
+                          {currentNotifications.map((notif, index) => {
+                            const isSelected = selectedNotifications.includes(notif.id);
+                            return (
+                              <motion.tr
+                                key={notif.id}
+                                className={`notif-row${isSelected ? ' notif-row-selected' : ''}`}
+                                initial={{ opacity: 0, x: -12 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 12, transition: { duration: 0.18 } }}
+                                transition={{ duration: 0.25, delay: index * 0.02 }}
+                                style={{
+                                  borderBottom: '1px solid #f0f0f0',
+                                  fontWeight: notif.isRead ? 400 : 600,
+                                  background: isSelected ? '#e7f0ff' : 'transparent',
+                                }}
+                              >
+                                {/* Checkbox */}
+                                <td style={{ padding: '0.55rem 0.5rem' }} onClick={e => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSelection(notif.id)}
+                                    style={{ cursor: 'pointer', accentColor: '#0d6efd' }}
+                                  />
+                                </td>
+
+                                {/* # */}
+                                <td style={{ padding: '0.55rem 0.65rem', color: '#adb5bd', fontSize: '0.72rem' }}>
+                                  {indexOfFirstItem + index + 1}
+                                </td>
+
+                                {/* Project title */}
+                                <td
+                                  style={{ padding: '0.55rem 0.65rem', cursor: 'pointer', maxWidth: '220px' }}
+                                  onClick={() => navigate(`/projects/edit/${notif.projectId}`)}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    {!notif.isRead && (
+                                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0d6efd', flexShrink: 0, display: 'inline-block' }} />
+                                    )}
+                                    <span style={{
+                                      color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                      fontWeight: notif.isRead ? 400 : 700,
+                                    }}>
+                                      {notif.title}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Ref code */}
+                                <td style={{ padding: '0.55rem 0.65rem', color: '#6c757d', fontSize: '0.75rem' }}>
+                                  {notif.refCode}
+                                </td>
+
+                                {/* Submission date */}
+                                <td style={{ padding: '0.55rem 0.65rem', color: '#495057', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                                  {new Date(notif.submissionDate).toLocaleDateString()}
+                                </td>
+
+                                {/* Status */}
+                                <td style={{ padding: '0.55rem 0.65rem' }}>
+                                  <StatusBadge status={notif.status} />
+                                </td>
+
+                                {/* Alert type */}
+                                <td style={{ padding: '0.55rem 0.65rem' }}>
+                                  <TypeBadge type={notif.type} />
+                                </td>
+
+                                {/* Days until due */}
+                                <td style={{ padding: '0.55rem 0.65rem', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                                  {notif.status !== 'completed' && notif.daysUntilDue !== undefined ? (
+                                    <span style={{
+                                      color: notif.daysUntilDue < 0 ? '#dc3545' : '#495057',
+                                      fontWeight: notif.daysUntilDue < 0 ? 700 : 400,
+                                    }}>
+                                      {notif.daysUntilDue < 0
+                                        ? `${Math.abs(notif.daysUntilDue)}d overdue`
+                                        : `${notif.daysUntilDue}d left`}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+
+                                {/* Actions */}
+                                <td style={{ padding: '0.55rem 0.65rem' }} onClick={e => e.stopPropagation()}>
+                                  <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                    <button
+                                      title={notif.isRead ? 'Mark unread' : 'Mark read'}
+                                      onClick={() => {
+                                        setSelectedNotifications([notif.id]);
+                                        bulkToggleRead(!notif.isRead);
+                                      }}
+                                      style={{
+                                        fontFamily: MONO, fontSize: '0.72rem', fontWeight: 600,
+                                        padding: '0.28rem 0.55rem', borderRadius: '4px', cursor: 'pointer',
+                                        border: `1px solid ${notif.isRead ? '#ced4da' : '#0d6efd'}`,
+                                        background: 'transparent',
+                                        color: notif.isRead ? '#6c757d' : '#0d6efd',
+                                        transition: 'all 0.15s',
+                                        display: 'inline-flex', alignItems: 'center',
+                                      }}
+                                    >
+                                      {notif.isRead ? <FaEye size={11} /> : <FaCheck size={11} />}
+                                    </button>
+                                    <button
+                                      title="Delete"
+                                      onClick={() => {
+                                        setSelectedNotifications([notif.id]);
+                                        bulkDeleteNotifications();
+                                      }}
+                                      style={{
+                                        fontFamily: MONO, fontSize: '0.72rem', fontWeight: 600,
+                                        padding: '0.28rem 0.55rem', borderRadius: '4px', cursor: 'pointer',
+                                        border: '1px solid #f5c2c7',
+                                        background: 'transparent', color: '#dc3545',
+                                        transition: 'all 0.15s',
+                                        display: 'inline-flex', alignItems: 'center',
+                                      }}
+                                    >
+                                      <FaTrash size={11} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <Divider />
+
+                  {/* ── Pagination ── */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: '#6c757d', margin: 0 }}>
+                      Showing{' '}
+                      <span style={{ fontWeight: 700, color: '#212529' }}>{indexOfFirstItem + 1}</span>
+                      {' '}–{' '}
+                      <span style={{ fontWeight: 700, color: '#212529' }}>{Math.min(indexOfLastItem, filteredNotifications.length)}</span>
+                      {' '}of{' '}
+                      <span style={{ fontWeight: 700, color: '#212529' }}>{filteredNotifications.length}</span>
+                      {' '}entries
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                      <button
+                        onClick={() => paginate(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        style={{
+                          fontFamily: MONO, fontSize: '0.75rem', fontWeight: 600,
+                          padding: '0.32rem 0.6rem', borderRadius: '4px', border: '1px solid #dee2e6',
+                          background: currentPage === 1 ? '#f8f9fa' : '#fff',
+                          color: currentPage === 1 ? '#adb5bd' : '#495057',
+                          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex', alignItems: 'center',
+                        }}
+                      >
+                        <FaChevronLeft size={11} />
+                      </button>
+
+                      {[...Array(Math.min(totalPages, 5))].map((_, i) => {
+                        let pageNumber;
+                        if (totalPages <= 5)                    pageNumber = i + 1;
+                        else if (currentPage <= 3)              pageNumber = i + 1;
+                        else if (currentPage >= totalPages - 2) pageNumber = totalPages - 4 + i;
+                        else                                    pageNumber = currentPage - 2 + i;
 
                         return (
-                          <motion.tr
-                            key={notif.id}
-                            className={`${!notif.isRead ? 'fw-semibold' : ''} ${typeConfig.bgClass} ${
-                              selectedNotifications.includes(notif.id) ? 'table-active' : ''
-                            }`}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
-                            transition={{ duration: 0.3, delay: index * 0.02 }}
-                            style={{ cursor: 'pointer' }}
+                          <button
+                            key={pageNumber}
+                            onClick={() => paginate(pageNumber)}
+                            style={{
+                              fontFamily: MONO, fontSize: '0.75rem', fontWeight: currentPage === pageNumber ? 700 : 500,
+                              padding: '0.32rem 0.65rem', borderRadius: '4px',
+                              border: `1px solid ${currentPage === pageNumber ? '#0d6efd' : '#dee2e6'}`,
+                              background: currentPage === pageNumber ? '#0d6efd' : '#fff',
+                              color: currentPage === pageNumber ? '#fff' : '#495057',
+                              cursor: 'pointer', transition: 'all 0.15s', minWidth: '34px',
+                            }}
                           >
-                            <td onClick={e => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedNotifications.includes(notif.id)}
-                                onChange={() => toggleNotificationSelection(notif.id)}
-                              />
-                            </td>
-                            <td>{indexOfFirstItem + index + 1}</td>
-                            <td
-                              onClick={() => navigate(`/projects/edit/${notif.projectId}`)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className="d-flex align-items-center">
-                                {!notif.isRead && (
-                                  <span
-                                    className="badge bg-primary me-2"
-                                    style={{ width: '8px', height: '8px', padding: 0 }}
-                                  />
-                                )}
-                                {notif.title}
-                              </div>
-                            </td>
-                            <td>{notif.refCode}</td>
-                            <td>{new Date(notif.submissionDate).toLocaleDateString()}</td>
-                            <td>
-                              <span className={`badge bg-${
-                                notif.status === 'completed'  ? 'success' :
-                                notif.status === 'in-progress'? 'warning' :
-                                notif.status === 'cancelled'  ? 'danger'  : 'secondary'
-                              }`}>
-                                {notif.status}
-                              </span>
-                            </td>
-                            <td>
-                              <NotificationBadge style={{
-                                background: typeConfig.color + '20',
-                                color: typeConfig.color,
-                                border: `1px solid ${typeConfig.color}`
-                              }}>
-                                <Icon size={12} />
-                                {typeConfig.label}
-                              </NotificationBadge>
-                            </td>
-                            <td>
-                              {notif.status !== 'completed' && notif.daysUntilDue !== undefined ? (
-                                <span className={notif.daysUntilDue < 0 ? 'text-danger fw-bold' : ''}>
-                                  {notif.daysUntilDue < 0
-                                    ? `${Math.abs(notif.daysUntilDue)}d overdue`
-                                    : `${notif.daysUntilDue}d left`}
-                                </span>
-                              ) : '-'}
-                            </td>
-                            <td onClick={e => e.stopPropagation()}>
-                              <div className="btn-group btn-group-sm">
-                                <button
-                                  className={`btn ${notif.isRead ? 'btn-outline-secondary' : 'btn-outline-primary'}`}
-                                  onClick={() => {
-                                    setSelectedNotifications([notif.id]);
-                                    bulkToggleRead(!notif.isRead);
-                                  }}
-                                  title={notif.isRead ? 'Mark as unread' : 'Mark as read'}
-                                >
-                                  {notif.isRead ? <FaEye /> : <FaCheck />}
-                                </button>
-                                <button
-                                  className="btn btn-outline-danger"
-                                  onClick={() => {
-                                    setSelectedNotifications([notif.id]);
-                                    bulkDeleteNotifications();
-                                  }}
-                                  title="Delete notification"
-                                >
-                                  <FaTrash />
-                                </button>
-                              </div>
-                            </td>
-                          </motion.tr>
+                            {pageNumber}
+                          </button>
                         );
                       })}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
 
-              {/* Pagination */}
-              <div className="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
-                <div className="text-muted">
-                  Showing <strong>{indexOfFirstItem + 1}</strong> to{' '}
-                  <strong>{Math.min(indexOfLastItem, filteredNotifications.length)}</strong> of{' '}
-                  <strong>{filteredNotifications.length}</strong> entries
-                </div>
-                <nav>
-                  <ul className="pagination mb-0">
-                    <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                      <button className="page-link" onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1}>
-                        <FaChevronLeft />
+                      <button
+                        onClick={() => paginate(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        style={{
+                          fontFamily: MONO, fontSize: '0.75rem', fontWeight: 600,
+                          padding: '0.32rem 0.6rem', borderRadius: '4px', border: '1px solid #dee2e6',
+                          background: currentPage === totalPages ? '#f8f9fa' : '#fff',
+                          color: currentPage === totalPages ? '#adb5bd' : '#495057',
+                          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex', alignItems: 'center',
+                        }}
+                      >
+                        <FaChevronRight size={11} />
                       </button>
-                    </li>
-                    {[...Array(Math.min(totalPages, 5))].map((_, index) => {
-                      let pageNumber;
-                      if (totalPages <= 5)            pageNumber = index + 1;
-                      else if (currentPage <= 3)      pageNumber = index + 1;
-                      else if (currentPage >= totalPages - 2) pageNumber = totalPages - 4 + index;
-                      else                            pageNumber = currentPage - 2 + index;
+                    </div>
+                  </div>
+                </>
+              )}
 
-                      return (
-                        <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                          <button className="page-link" onClick={() => paginate(pageNumber)}>{pageNumber}</button>
-                        </li>
-                      );
-                    })}
-                    <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                      <button className="page-link" onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages}>
-                        <FaChevronRight />
-                      </button>
-                    </li>
-                  </ul>
-                </nav>
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
-      </StyledCard>
-    </div>
+      </div>
+    </>
   );
 }
 

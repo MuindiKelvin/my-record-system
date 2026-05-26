@@ -1,30 +1,112 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, doc, deleteDoc, addDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import * as XLSX from 'xlsx';
 import { CSVLink } from 'react-csv';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaListAlt, FaFileExcel, FaFileCsv,
   FaFilter, FaSort, FaSearch, FaCalendarAlt,
-  FaFileImport, FaGraduationCap
+  FaFileImport, FaGraduationCap,
+  FaPencilAlt, FaTrashAlt
 } from 'react-icons/fa';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Font style: IBM Plex Mono / Fira Code / monospace
+// ─────────────────────────────────────────────────────────────────────────────
+const MONO_FONT = "'IBM Plex Mono', 'Fira Code', monospace";
+const monoStyle = { fontFamily: MONO_FONT };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ActionButton — icon pill with slide-in label on hover
+// ─────────────────────────────────────────────────────────────────────────────
+function ActionButton({ icon: Icon, label, onClick, variant }) {
+  const [hovered, setHovered] = useState(false);
+
+  const palette = {
+    edit: {
+      idle:    { bg: '#e8f0fe', iconColor: '#1a73e8', border: '#c5d8ff' },
+      hover:   { bg: '#1a73e8', iconColor: '#fff',    border: '#1a73e8' },
+      shadow:  '0 4px 14px rgba(26,115,232,0.35)',
+    },
+    delete: {
+      idle:    { bg: '#fce8e8', iconColor: '#d93025', border: '#f5c6c4' },
+      hover:   { bg: '#d93025', iconColor: '#fff',    border: '#d93025' },
+      shadow:  '0 4px 14px rgba(217,48,37,0.35)',
+    },
+  };
+
+  const p      = palette[variant] || palette.edit;
+  const colors = hovered ? p.hover : p.idle;
+
+  return (
+    <motion.button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={label}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0,
+        overflow: 'hidden',
+        padding: '0 10px',
+        height: '30px',
+        border: `1.5px solid ${colors.border}`,
+        borderRadius: '20px',
+        background: colors.bg,
+        cursor: 'pointer',
+        outline: 'none',
+        boxShadow: hovered ? p.shadow : 'none',
+        transition: 'background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
+        fontFamily: MONO_FONT,
+        whiteSpace: 'nowrap',
+      }}
+      whileTap={{ scale: 0.92 }}
+    >
+      {/* Icon */}
+      <motion.span
+        animate={{ color: colors.iconColor }}
+        transition={{ duration: 0.15 }}
+        style={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem' }}
+      >
+        <Icon />
+      </motion.span>
+
+      {/* Label — slides in on hover */}
+      <AnimatePresence initial={false}>
+        {hovered && (
+          <motion.span
+            key="label"
+            initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+            animate={{ width: 'auto', opacity: 1, marginLeft: 5 }}
+            exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            style={{
+              display: 'inline-block',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: colors.iconColor,
+              fontFamily: MONO_FONT,
+              overflow: 'hidden',
+            }}
+          >
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Dissertation Invoice Generator — with Code Amount support
-//
-// Header layout:
-//   Code | Assignment | <month cols…> | CPP | Amount | Code | Total | Amount Paid
-//
-// "Code" column: populated only where hasCode === true (shows the codeAmount).
-// "Total" column: Amount + Code  (formula in XLSX, sum in CSV).
-// Amount Paid (first row of client block): covers word-count rows + PPT rows +
-//   project-code rows + code amounts, consistent with existing logic.
 // ─────────────────────────────────────────────────────────────────────────────
 function generateDissertationInvoice(dissertationProjects, targetMonthLabel, format = 'xlsx') {
 
-  // ── 1. Group by orderRefCode ─────────────────────────────────────────────
   const clientMap = new Map();
 
   for (const p of dissertationProjects) {
@@ -52,7 +134,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     else                    entry.rows.push(p);
   }
 
-  // ── 2. Collect distinct months ───────────────────────────────────────────
   const monthKeySet = new Set();
   for (const [, client] of clientMap) {
     for (const p of client.rows) {
@@ -67,38 +148,31 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     return new Date(Number(yr), Number(mo) - 1, 1).toLocaleString('default', { month: 'long' });
   });
 
-  // ── 3. Column index helpers ──────────────────────────────────────────────
-  // Header: Code | Assignment | [month cols] | CPP | Amount | Code | Total | Amount Paid
   const monthCount    = monthKeys.length;
-  const CPP_COL_IDX   = 2 + monthCount;      // 0-based
-  const AMT_COL_IDX   = CPP_COL_IDX  + 1;   // word-count amount
-  const CODE_COL_IDX  = AMT_COL_IDX  + 1;   // code amount
-  const TOTAL_COL_IDX = CODE_COL_IDX + 1;   // Amount + Code
-  const PAID_COL_IDX  = TOTAL_COL_IDX + 1;  // Amount Paid
-
+  const CPP_COL_IDX   = 2 + monthCount;
+  const AMT_COL_IDX   = CPP_COL_IDX  + 1;
+  const CODE_COL_IDX  = AMT_COL_IDX  + 1;
+  const TOTAL_COL_IDX = CODE_COL_IDX + 1;
+  const PAID_COL_IDX  = TOTAL_COL_IDX + 1;
   const COL_COUNT = PAID_COL_IDX + 1;
 
-  // Excel column letters (for formula building)
   const cppColLetter   = XLSX.utils.encode_col(CPP_COL_IDX);
   const amtColLetter   = XLSX.utils.encode_col(AMT_COL_IDX);
   const codeColLetter  = XLSX.utils.encode_col(CODE_COL_IDX);
   const totalColLetter = XLSX.utils.encode_col(TOTAL_COL_IDX);
   const paidColLetter  = XLSX.utils.encode_col(PAID_COL_IDX);
 
-  // ── 4. Build header row ──────────────────────────────────────────────────
   const headerRow = [
     'Code', 'Assignment',
     ...monthLabels,
     'CPP', 'Amount', 'Code', 'Total Due', 'Amount Paid'
   ];
 
-  // ── 5. Build data rows ───────────────────────────────────────────────────
   const dataRows    = [headerRow];
-  const formulaRows = []; // rows where Amount = words/275*CPP  and  Total = Amount + Code
+  const formulaRows = [];
 
-  let excelRowIdx = 2; // 1-indexed (row 1 = header)
+  let excelRowIdx = 2;
 
-  // Helper: total amount paid for a client block
   const clientAmountPaid = (client) => {
     const allRows = [...client.rows, ...client.projectCodes, ...(client.pptRows || [])];
     return allRows.reduce((sum, p) => {
@@ -113,7 +187,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     const totalAmountPaid = clientAmountPaid(client);
     let firstRowWritten = false;
 
-    // ── Word-count rows ────────────────────────────────────────────────────
     for (const p of client.rows) {
       const wordCols = monthKeys.map(mk => {
         const d  = new Date(p.orderDate);
@@ -122,7 +195,7 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       });
 
       const cpp     = Number(p.cpp) || 400;
-      const codeAmt = p.hasCode ? (Number(p.codeAmount) || 0) : ''; // blank when no code
+      const codeAmt = p.hasCode ? (Number(p.codeAmount) || 0) : '';
 
       const monthColOffset = monthKeys.findIndex(mk => {
         const d  = new Date(p.orderDate);
@@ -133,15 +206,14 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       const amountPaidCell = !firstRowWritten ? totalAmountPaid : '';
       firstRowWritten = true;
 
-      // null placeholders for Amount and Total — formulas inserted later (XLSX) or computed (CSV)
       const row = new Array(COL_COUNT).fill('');
       row[0]             = p.orderRefCode || '';
       row[1]             = p.topic || '';
       wordCols.forEach((v, i) => { row[2 + i] = v; });
       row[CPP_COL_IDX]   = cpp;
-      row[AMT_COL_IDX]   = null;  // formula placeholder
+      row[AMT_COL_IDX]   = null;
       row[CODE_COL_IDX]  = codeAmt;
-      row[TOTAL_COL_IDX] = null;  // formula placeholder
+      row[TOTAL_COL_IDX] = null;
       row[PAID_COL_IDX]  = amountPaidCell;
 
       dataRows.push(row);
@@ -149,7 +221,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       excelRowIdx++;
     }
 
-    // ── PPT rows ───────────────────────────────────────────────────────────
     for (const pt of (client.pptRows || [])) {
       const flatAmount = Number(pt.amount) || 0;
       const codeAmt    = pt.hasCode ? (Number(pt.codeAmount) || 0) : '';
@@ -171,7 +242,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       excelRowIdx++;
     }
 
-    // ── Project Code sub-rows ──────────────────────────────────────────────
     for (const pc of client.projectCodes) {
       const flatAmount = Number(pc.amount) || 10000;
       const codeAmt    = pc.hasCode ? (Number(pc.codeAmount) || 0) : '';
@@ -192,7 +262,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     }
   }
 
-  // ── 6. Totals row ─────────────────────────────────────────────────────────
   const grandTotalAmountPaid = Array.from(clientMap.values()).reduce((sum, client) => {
     return sum + clientAmountPaid(client);
   }, 0);
@@ -204,12 +273,11 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
 
   const firstDataRow  = 2;
   const lastDataRow   = excelRowIdx - 1;
-  const totalExcelRow = excelRowIdx + 1; // +1 for blank spacer
+  const totalExcelRow = excelRowIdx + 1;
 
-  // ── 7a. CSV export ────────────────────────────────────────────────────────
   if (format === 'csv') {
     const csvRows = dataRows.map((row, rIdx) => {
-      if (rIdx === 0) return row; // header
+      if (rIdx === 0) return row;
       const fr = formulaRows.find(f => f.excelRow === rIdx + 1);
       if (fr) {
         const wordColIdx = XLSX.utils.decode_col(fr.wordCol);
@@ -245,21 +313,15 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     return;
   }
 
-  // ── 7b. XLSX export ───────────────────────────────────────────────────────
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(dataRows);
 
-  // Insert formulas for word-count rows
   for (const fr of formulaRows) {
     const r = fr.excelRow;
-
-    // Amount = words / 275 * CPP
     ws[`${amtColLetter}${r}`] = {
       t: 'n',
       f: `=${fr.wordCol}${r}/275*${cppColLetter}${r}`
     };
-
-    // Total = Amount + Code
     ws[`${totalColLetter}${r}`] = {
       t: 'n',
       f: fr.hasCode
@@ -268,33 +330,29 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     };
   }
 
-  // SUM formulas for the totals row
   ws[`${amtColLetter}${totalExcelRow}`]   = { t: 'n', f: `=SUM(${amtColLetter}${firstDataRow}:${amtColLetter}${lastDataRow})` };
   ws[`${codeColLetter}${totalExcelRow}`]  = { t: 'n', f: `=SUM(${codeColLetter}${firstDataRow}:${codeColLetter}${lastDataRow})` };
   ws[`${totalColLetter}${totalExcelRow}`] = { t: 'n', f: `=SUM(${totalColLetter}${firstDataRow}:${totalColLetter}${lastDataRow})` };
   ws[`${paidColLetter}${totalExcelRow}`]  = { t: 'n', f: `=SUM(${paidColLetter}${firstDataRow}:${paidColLetter}${lastDataRow})` };
 
-  // ── 8. Column widths ──────────────────────────────────────────────────────
   ws['!cols'] = [
-    { wch: 14 },                             // A: Code
-    { wch: 30 },                             // B: Assignment
-    ...monthKeys.map(() => ({ wch: 10 })),  // month cols
-    { wch: 8  },                             // CPP
-    { wch: 14 },                             // Amount
-    { wch: 12 },                             // Code
-    { wch: 14 },                             // Total
-    { wch: 16 },                             // Amount Paid
+    { wch: 14 },
+    { wch: 30 },
+    ...monthKeys.map(() => ({ wch: 10 })),
+    { wch: 8  },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 16 },
   ];
 
-  // ── 9. Styling ────────────────────────────────────────────────────────────
   const HEADER_FILL = 'FF4472C4';
   const HEADER_FONT = 'FFFFFFFF';
   const EVEN_FILL   = 'FFDCE6F1';
   const ODD_FILL    = 'FFFFFFFF';
   const PC_FILL     = 'FFEDEDED';
-  const CODE_FILL   = 'FFFFE0B2'; // light orange tint for Code column header
+  const CODE_FILL   = 'FFFFE0B2';
 
-  // Header row styling
   for (let c = 0; c < headerRow.length; c++) {
     const cellRef = XLSX.utils.encode_cell({ r: 0, c });
     if (!ws[cellRef]) ws[cellRef] = { t: 's', v: headerRow[c] };
@@ -310,7 +368,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     };
   }
 
-  // Data row styling — alternating zebra + right-align numbers
   let styleRow  = 1;
   let clientIdx = 0;
   for (const [, client] of clientMap) {
@@ -329,7 +386,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       styleRow++;
     }
 
-    // PPT rows — amber italic
     for (let i = 0; i < (client.pptRows || []).length; i++) {
       for (let c = 0; c < headerRow.length; c++) {
         const cellRef = XLSX.utils.encode_cell({ r: styleRow, c });
@@ -344,7 +400,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
       styleRow++;
     }
 
-    // Project Code rows — grey italic
     for (let i = 0; i < client.projectCodes.length; i++) {
       for (let c = 0; c < headerRow.length; c++) {
         const cellRef = XLSX.utils.encode_cell({ r: styleRow, c });
@@ -360,8 +415,7 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
     clientIdx++;
   }
 
-  // Totals row styling
-  styleRow++; // blank spacer
+  styleRow++;
   const TOTAL_CELL_STYLE = {
     font:      { bold: true },
     alignment: { horizontal: 'right' },
@@ -381,7 +435,6 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
   if (!ws[totalPaidRef]) ws[totalPaidRef] = { t: 'n', v: grandTotalAmountPaid };
   ws[totalPaidRef].s = { ...TOTAL_CELL_STYLE, fill: { fgColor: { rgb: 'FFE2EFDA' } } };
 
-  // Update sheet range
   ws['!ref'] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
     e: { r: styleRow, c: headerRow.length - 1 }
@@ -677,7 +730,6 @@ function ProjectList() {
     return data;
   };
 
-  // ── Dissertation Invoice Export ──────────────────────────────────────────
   const exportDissertationInvoice = () => {
     const dissertationProjects = filteredProjects.filter(p => p.orderType === 'dissertation');
     if (!dissertationProjects.length) {
@@ -698,7 +750,6 @@ function ProjectList() {
     }
   };
 
-  // ── Standard Export ──────────────────────────────────────────────────────
   const exportData = () => {
     if (!Object.values(selectedColumns).some(Boolean)) {
       setError('Please select at least one column to export');
@@ -798,93 +849,243 @@ function ProjectList() {
 
   const handleAddProject = () => navigate('/projects/new');
 
-  const totalPages       = Math.ceil(filteredProjects.length / itemsPerPage);
-  const startIndex       = (currentPage - 1) * itemsPerPage;
+  const totalPages        = Math.ceil(filteredProjects.length / itemsPerPage);
+  const startIndex        = (currentPage - 1) * itemsPerPage;
   const paginatedProjects = filteredProjects.slice(startIndex, startIndex + itemsPerPage);
 
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center p-5">
-        <motion.div className="spinner-border text-primary" role="status"
-          animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }}>
-          <span className="visually-hidden">Loading...</span>
+        <motion.div
+          className="spinner-border text-primary"
+          role="status"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity }}
+        >
+          <span className="visually-hidden" style={monoStyle}>Loading...</span>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="container-fluid py-4">
-      {/* Toast */}
-      <div className="position-fixed top-0 end-0 p-3" style={{ zIndex: 1050 }}>
-        <motion.div ref={toastRef} className={`toast ${toast.show ? 'show' : ''} bg-${toast.type}`}
-          role="alert" initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: toast.show ? 1 : 0, y: toast.show ? 0 : -50 }}
-          transition={{ duration: 0.3 }}>
-          <div className="toast-header">
-            <strong className="me-auto text-white">
-              {toast.type === 'success' ? 'Success' : toast.type === 'danger' ? 'Error' : 'Warning'}
-            </strong>
-            <button type="button" className="btn-close btn-close-white"
-              onClick={() => setToast({ show: false, message: '', type: '' })} />
-          </div>
-          <div className="toast-body text-white">{toast.message}</div>
-        </motion.div>
-      </div>
+    <>
+      {/* ── Styles ── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap');
 
-      <div className="card shadow">
-        <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <h2 className="h4 mb-0"><FaListAlt className="me-2" /> Projects Management</h2>
-          <button className="btn btn-light" onClick={handleAddProject}>+ Add Project</button>
+        .pl-mono, .pl-mono * {
+          font-family: 'IBM Plex Mono', 'Fira Code', monospace !important;
+        }
+
+        .pl-mono .form-control,
+        .pl-mono .form-select,
+        .pl-mono .btn,
+        .pl-mono .badge,
+        .pl-mono th,
+        .pl-mono td,
+        .pl-mono .card-header,
+        .pl-mono .card-body,
+        .pl-mono label,
+        .pl-mono .form-check-label,
+        .pl-mono .page-link,
+        .pl-mono .alert,
+        .pl-mono .toast,
+        .pl-mono .toast-header,
+        .pl-mono .toast-body,
+        .pl-mono input,
+        .pl-mono select,
+        .pl-mono textarea {
+          font-family: 'IBM Plex Mono', 'Fira Code', monospace !important;
+        }
+
+        .pl-mono .form-control::placeholder {
+          font-family: 'IBM Plex Mono', 'Fira Code', monospace !important;
+        }
+
+        .pl-mono .card-header h2 {
+          letter-spacing: -0.02em;
+        }
+
+        .pl-mono th {
+          font-size: 0.72rem;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .pl-mono td {
+          font-size: 0.82rem;
+        }
+
+        .pl-mono .badge {
+          font-size: 0.68rem;
+          letter-spacing: 0.05em;
+        }
+
+        .pl-mono .btn {
+          font-size: 0.82rem;
+          letter-spacing: 0.02em;
+        }
+
+        .pl-mono .form-control,
+        .pl-mono .form-select,
+        .pl-mono input[type="date"],
+        .pl-mono input[type="text"],
+        .pl-mono input[type="number"] {
+          font-size: 0.82rem;
+        }
+
+        .pl-mono .page-link {
+          font-size: 0.78rem;
+        }
+
+        .pl-mono .alert {
+          font-size: 0.82rem;
+        }
+
+        .pl-mono .form-check-label {
+          font-size: 0.8rem;
+        }
+
+        .pl-mono small,
+        .pl-mono .small {
+          font-size: 0.72rem;
+        }
+
+        /* Actions cell — keep buttons together without wrapping */
+        .actions-cell {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+      `}</style>
+
+      <div className="container-fluid py-4 pl-mono">
+        {/* ── Toast ── */}
+        <div className="position-fixed top-0 end-0 p-3" style={{ zIndex: 1050 }}>
+          <motion.div
+            ref={toastRef}
+            className={`toast ${toast.show ? 'show' : ''} bg-${toast.type}`}
+            role="alert"
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: toast.show ? 1 : 0, y: toast.show ? 0 : -50 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="toast-header">
+              <strong className="me-auto text-white">
+                {toast.type === 'success' ? 'Success' : toast.type === 'danger' ? 'Error' : 'Warning'}
+              </strong>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setToast({ show: false, message: '', type: '' })}
+              />
+            </div>
+            <div className="toast-body text-white">{toast.message}</div>
+          </motion.div>
         </div>
 
-        <div className="card-body">
-          {/* Filters Row */}
-          <div className="row mb-3 g-2">
-            <div className="col-md-3">
-              <div className="input-group">
-                <span className="input-group-text"><FaSearch /></span>
-                <input type="text" className="form-control" placeholder="Search projects..."
-                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        <div className="card shadow">
+          <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h2 className="h4 mb-0">
+              <FaListAlt className="me-2" /> Projects Management
+            </h2>
+            <button className="btn btn-light" onClick={handleAddProject}>
+              + Add Project
+            </button>
+          </div>
+
+          <div className="card-body">
+            {/* ── Filters Row ── */}
+            <div
+              className="mb-3"
+              style={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                alignItems: 'center',
+                gap: '0.4rem',
+                overflowX: 'auto',
+              }}
+            >
+              {/* Search */}
+              <div className="input-group" style={{ flex: '1 1 180px', minWidth: '140px' }}>
+                <span className="input-group-text px-2"><FaSearch /></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="col-md-2">
-              <div className="input-group">
-                <span className="input-group-text"><FaCalendarAlt /></span>
-                <input type="date" className="form-control" value={startDate}
-                  onChange={e => setStartDate(e.target.value)} />
+
+              {/* Start date */}
+              <div className="input-group" style={{ flex: '0 0 160px' }}>
+                <span className="input-group-text px-2"><FaCalendarAlt /></span>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="col-md-2">
-              <div className="input-group">
-                <span className="input-group-text"><FaCalendarAlt /></span>
-                <input type="date" className="form-control" value={endDate}
-                  onChange={e => setEndDate(e.target.value)} />
+
+              {/* End date */}
+              <div className="input-group" style={{ flex: '0 0 160px' }}>
+                <span className="input-group-text px-2"><FaCalendarAlt /></span>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="col-md-2">
-              <div className="input-group">
-                <span className="input-group-text"><FaFilter /></span>
-                <select className="form-select" value={selectedCategory}
-                  onChange={e => setSelectedCategory(e.target.value)}>
-                  <option value="all">All Categories</option>
+
+              {/* Category filter */}
+              <div className="input-group" style={{ flex: '0 0 160px' }}>
+                <span className="input-group-text px-2"><FaFilter /></span>
+                <select
+                  className="form-select"
+                  value={selectedCategory}
+                  onChange={e => setSelectedCategory(e.target.value)}
+                >
+                  <option value="all">All</option>
                   <option value="normal">Normal</option>
                   <option value="dissertation">Dissertation</option>
                 </select>
               </div>
-            </div>
-            <div className="col-md-3 text-end d-flex gap-1 justify-content-end flex-wrap">
-              <button className="btn btn-outline-primary"
-                onClick={() => setShowColumnSelector(!showColumnSelector)}>
+
+              {/* Divider */}
+              <div style={{ width: '1px', height: '32px', background: '#dee2e6', flexShrink: 0 }} />
+
+              {/* Columns toggle */}
+              <button
+                className="btn btn-outline-primary btn-sm"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                onClick={() => setShowColumnSelector(!showColumnSelector)}
+              >
                 <FaSort className="me-1" /> Columns
               </button>
-              <select className="form-select" value={exportFormat}
-                onChange={e => setExportFormat(e.target.value)} style={{ maxWidth: '90px' }}>
+
+              {/* Format selector */}
+              <select
+                className="form-select form-select-sm"
+                value={exportFormat}
+                onChange={e => setExportFormat(e.target.value)}
+                style={{ width: '75px', flexShrink: 0 }}
+              >
                 <option value="xlsx">XLSX</option>
                 <option value="csv">CSV</option>
               </select>
+
+              {/* Export button */}
               {exportFormat === 'xlsx' ? (
-                <button className="btn btn-success" onClick={exportData}>
+                <button
+                  className="btn btn-success btn-sm"
+                  style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onClick={exportData}
+                >
                   <FaFileExcel className="me-1" /> Export
                 </button>
               ) : (
@@ -895,7 +1096,8 @@ function ProjectList() {
                     : selectedCategory === 'normal'     ? 'Kevz_Normal_Invoice'
                     : 'Kevz_All_Invoice'
                   }_${getMonthYearString(startDate || new Date())}.csv`}
-                  className="btn btn-success"
+                  className="btn btn-success btn-sm"
+                  style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                   onClick={() => {
                     if (!Object.values(selectedColumns).some(Boolean)) {
                       showNotification('Please select at least one column', 'warning');
@@ -904,210 +1106,297 @@ function ProjectList() {
                     showNotification('Projects exported successfully', 'success');
                     setError('');
                     return true;
-                  }}>
+                  }}
+                >
                   <FaFileCsv className="me-1" /> Export
                 </CSVLink>
               )}
 
-              {/* ── Dissertation Invoice export button (uses the shared format selector above) ── */}
+              {/* Dissertation Invoice */}
               <button
-                className="btn btn-warning text-dark fw-semibold"
+                className="btn btn-warning btn-sm text-dark fw-semibold"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                 onClick={exportDissertationInvoice}
-                title="Generate formatted dissertation invoice (matching the Kevz invoice format)"
+                title="Generate formatted dissertation invoice"
               >
-                <FaGraduationCap className="me-1" /> Dissertation Invoice
+                <FaGraduationCap className="me-1" /> Diss. Invoice
               </button>
 
-              <button className="btn btn-secondary" onClick={resetFilters}>Reset</button>
-              <input type="file" id="importExcel" className="d-none" accept=".xlsx,.xls"
-                onChange={importFromExcel} />
-              <button className="btn btn-info"
-                onClick={() => document.getElementById('importExcel').click()}>
+              {/* Reset */}
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                onClick={resetFilters}
+              >
+                Reset
+              </button>
+
+              {/* Import */}
+              <input
+                type="file"
+                id="importExcel"
+                className="d-none"
+                accept=".xlsx,.xls"
+                onChange={importFromExcel}
+              />
+              <button
+                className="btn btn-info btn-sm"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                onClick={() => document.getElementById('importExcel').click()}
+              >
                 <FaFileImport className="me-1" /> Import
               </button>
             </div>
-          </div>
 
-          {/* Column Selector */}
-          {showColumnSelector && (
-            <motion.div className="card mb-3" initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}>
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h5 className="mb-0">Select Columns for Export</h5>
-                  <div>
-                    <button className="btn btn-sm btn-outline-primary me-2"
-                      onClick={() => toggleAllColumns(true)}>Select All</button>
-                    <button className="btn btn-sm btn-outline-secondary"
-                      onClick={() => toggleAllColumns(false)}>Deselect All</button>
+            {/* ── Column Selector ── */}
+            {showColumnSelector && (
+              <motion.div
+                className="card mb-3"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h5 className="mb-0">Select Columns for Export</h5>
+                    <div>
+                      <button
+                        className="btn btn-sm btn-outline-primary me-2"
+                        onClick={() => toggleAllColumns(true)}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => toggleAllColumns(false)}
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="row">
+                    {columns.map(col => (
+                      <div key={col.id} className="col-md-3 mb-2">
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`col-${col.id}`}
+                            checked={selectedColumns[col.id] || false}
+                            onChange={() => toggleColumn(col.id)}
+                          />
+                          <label className="form-check-label" htmlFor={`col-${col.id}`}>
+                            {col.label}
+                          </label>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="row">
-                  {columns.map(col => (
-                    <div key={col.id} className="col-md-3 mb-2">
-                      <div className="form-check">
-                        <input className="form-check-input" type="checkbox" id={`col-${col.id}`}
-                          checked={selectedColumns[col.id] || false}
-                          onChange={() => toggleColumn(col.id)} />
-                        <label className="form-check-label" htmlFor={`col-${col.id}`}>
-                          {col.label}
-                        </label>
-                      </div>
-                    </div>
+              </motion.div>
+            )}
+
+            {/* ── Dissertation Invoice Info Banner ── */}
+            {selectedCategory === 'dissertation' && (
+              <motion.div
+                className="alert alert-info d-flex align-items-center gap-2 py-2 mb-3"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <FaGraduationCap size={18} />
+                <span>
+                  <strong>Dissertation Invoice mode:</strong> Click <em>Dissertation Invoice</em> to
+                  generate a formatted invoice showing each client's word counts per month, CPP, calculated
+                  amount, code amount, total, and amount paid — matching the Kevz Dissertations Invoice
+                  layout. The format selector above (XLSX / CSV) applies to both Export and Dissertation Invoice.
+                </span>
+              </motion.div>
+            )}
+
+            {error && (
+              <motion.div
+                className="alert alert-danger"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                {error}
+              </motion.div>
+            )}
+
+            {/* ── Table ── */}
+            <div className="table-responsive">
+              <table className="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    {[
+                      'number', 'orderDate', 'submissionDate', 'orderRefCode', 'orderType',
+                      'topic', 'words', 'amount', 'paymentStatus', 'amountPaid',
+                      'balance', 'status', 'priority', 'due'
+                    ].map(key => (
+                      <th
+                        key={key}
+                        onClick={() => handleSort(key)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {columns.find(c => c.id === key)?.label}
+                        {sortConfig.key === key && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      </th>
+                    ))}
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedProjects.map((p, idx) => (
+                    <motion.tr
+                      key={p.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                      className={p.isOverdue ? 'table-danger' : p.isDue ? 'table-warning' : ''}
+                    >
+                      <td>
+                        {startIndex + idx + 1}
+                        {p.isCarryForward && (
+                          <span
+                            className="badge bg-info ms-1"
+                            title="Balance carried forward"
+                            style={{ fontSize: '0.65rem' }}
+                          >
+                            CF
+                          </span>
+                        )}
+                      </td>
+                      <td>{new Date(p.orderDate).toLocaleDateString()}</td>
+                      <td>{new Date(p.submissionDate).toLocaleDateString()}</td>
+                      <td>{p.orderRefCode}</td>
+                      <td className="text-capitalize">{p.orderType}</td>
+                      <td>{p.topic}</td>
+                      <td>{p.words}</td>
+                      <td>Ksh.{Number(p.amount).toFixed(2)}</td>
+                      <td>
+                        <span
+                          className={`badge bg-${
+                            p.paymentStatus === 'paid'    ? 'success' :
+                            p.paymentStatus === 'partial' ? 'warning' : 'secondary'
+                          }`}
+                        >
+                          {p.paymentStatus || 'unpaid'}
+                        </span>
+                      </td>
+                      <td>
+                        {p.paymentStatus === 'partial'
+                          ? `Ksh.${Number(p.amountPaid || 0).toFixed(2)}`
+                          : p.paymentStatus === 'paid' ? 'Fully Paid' : '-'}
+                      </td>
+                      <td>
+                        {p.paymentStatus === 'partial'
+                          ? `Ksh.${Number(p.balance || 0).toFixed(2)}`
+                          : '-'}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge bg-${
+                            p.status === 'completed'   ? 'success' :
+                            p.status === 'in-progress' ? 'warning' :
+                            p.status === 'cancelled'   ? 'danger'  : 'secondary'
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge bg-${
+                            p.priority === 'urgent' ? 'danger'  :
+                            p.priority === 'high'   ? 'warning' :
+                            p.priority === 'medium' ? 'info'    : 'secondary'
+                          }`}
+                        >
+                          {p.priority}
+                        </span>
+                      </td>
+                      <td>
+                        {p.daysUntilDue !== undefined && p.status !== 'completed'
+                          ? p.daysUntilDue < 0
+                            ? `${Math.abs(p.daysUntilDue)} days overdue`
+                            : `${p.daysUntilDue} days remaining`
+                          : '-'}
+                      </td>
+
+                      {/* ── Action Buttons ── */}
+                      <td>
+                        <div className="actions-cell">
+                          <ActionButton
+                            icon={FaPencilAlt}
+                            label="Edit"
+                            variant="edit"
+                            onClick={() => navigate(`/projects/edit/${p.id}`)}
+                          />
+                          <ActionButton
+                            icon={FaTrashAlt}
+                            label="Delete"
+                            variant="delete"
+                            onClick={() => handleDelete(p.id)}
+                          />
+                        </div>
+                      </td>
+                    </motion.tr>
                   ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Dissertation Invoice Info Banner */}
-          {selectedCategory === 'dissertation' && (
-            <motion.div
-              className="alert alert-info d-flex align-items-center gap-2 py-2 mb-3"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <FaGraduationCap size={18} />
-              <span>
-                <strong>Dissertation Invoice mode:</strong> Click <em>Dissertation Invoice</em> to
-                generate a formatted invoice showing each client's word counts per month, CPP, calculated
-                amount, code amount, total, and amount paid — matching the Kevz Dissertations Invoice
-                layout. The format selector above (XLSX / CSV) applies to both Export and Dissertation Invoice.
-              </span>
-            </motion.div>
-          )}
-
-          {error && (
-            <motion.div className="alert alert-danger" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {error}
-            </motion.div>
-          )}
-
-          {/* Table */}
-          <div className="table-responsive">
-            <table className="table table-striped table-hover">
-              <thead>
-                <tr>
-                  {[
-                    'number', 'orderDate', 'submissionDate', 'orderRefCode', 'orderType',
-                    'topic', 'words', 'amount', 'paymentStatus', 'amountPaid',
-                    'balance', 'status', 'priority', 'due'
-                  ].map(key => (
-                    <th key={key} onClick={() => handleSort(key)} style={{ cursor: 'pointer' }}>
-                      {columns.find(c => c.id === key)?.label}
-                      {sortConfig.key === key && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                    </th>
-                  ))}
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedProjects.map((p, idx) => (
-                  <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
-                    className={p.isOverdue ? 'table-danger' : p.isDue ? 'table-warning' : ''}>
-                    <td>
-                      {startIndex + idx + 1}
-                      {p.isCarryForward && (
-                        <span className="badge bg-info ms-1" title="Balance carried forward"
-                          style={{ fontSize: '0.65rem' }}>CF</span>
-                      )}
-                    </td>
-                    <td>{new Date(p.orderDate).toLocaleDateString()}</td>
-                    <td>{new Date(p.submissionDate).toLocaleDateString()}</td>
-                    <td>{p.orderRefCode}</td>
-                    <td className="text-capitalize">{p.orderType}</td>
-                    <td>{p.topic}</td>
-                    <td>{p.words}</td>
-                    <td>Ksh.{Number(p.amount).toFixed(2)}</td>
-                    <td>
-                      <span className={`badge bg-${
-                        p.paymentStatus === 'paid'    ? 'success' :
-                        p.paymentStatus === 'partial' ? 'warning' : 'secondary'
-                      }`}>
-                        {p.paymentStatus || 'unpaid'}
-                      </span>
-                    </td>
-                    <td>
-                      {p.paymentStatus === 'partial'
-                        ? `Ksh.${Number(p.amountPaid || 0).toFixed(2)}`
-                        : p.paymentStatus === 'paid' ? 'Fully Paid' : '-'}
-                    </td>
-                    <td>
-                      {p.paymentStatus === 'partial'
-                        ? `Ksh.${Number(p.balance || 0).toFixed(2)}`
-                        : '-'}
-                    </td>
-                    <td>
-                      <span className={`badge bg-${
-                        p.status === 'completed'  ? 'success' :
-                        p.status === 'in-progress'? 'warning' :
-                        p.status === 'cancelled'  ? 'danger'  : 'secondary'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge bg-${
-                        p.priority === 'urgent' ? 'danger'    :
-                        p.priority === 'high'   ? 'warning'   :
-                        p.priority === 'medium' ? 'info'      : 'secondary'
-                      }`}>
-                        {p.priority}
-                      </span>
-                    </td>
-                    <td>
-                      {p.daysUntilDue !== undefined && p.status !== 'completed'
-                        ? p.daysUntilDue < 0
-                          ? `${Math.abs(p.daysUntilDue)} days overdue`
-                          : `${p.daysUntilDue} days remaining`
-                        : '-'}
-                    </td>
-                    <td>
-                      <div className="btn-group">
-                        <button className="btn btn-sm btn-outline-primary"
-                          onClick={() => navigate(`/projects/edit/${p.id}`)}>Edit</button>
-                        <button className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleDelete(p.id)}>Delete</button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="d-flex justify-content-between align-items-center mt-3">
-            <div>
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredProjects.length)} of{' '}
-              {filteredProjects.length} entries
-              <select className="form-select d-inline-block ms-2" value={itemsPerPage}
-                onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                style={{ width: 'auto' }}>
-                {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
+                </tbody>
+              </table>
             </div>
-            <nav>
-              <ul className="pagination mb-0">
-                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                  <button className="page-link"
-                    onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}>Previous</button>
-                </li>
-                {[...Array(totalPages)].map((_, i) => (
-                  <li key={i + 1} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
-                    <button className="page-link" onClick={() => setCurrentPage(i + 1)}>{i + 1}</button>
+
+            {/* ── Pagination ── */}
+            <div className="d-flex justify-content-between align-items-center mt-3">
+              <div>
+                Showing {startIndex + 1} to{' '}
+                {Math.min(startIndex + itemsPerPage, filteredProjects.length)} of{' '}
+                {filteredProjects.length} entries
+                <select
+                  className="form-select d-inline-block ms-2"
+                  value={itemsPerPage}
+                  onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                  style={{ width: 'auto' }}
+                >
+                  {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <nav>
+                <ul className="pagination mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                    >
+                      Previous
+                    </button>
                   </li>
-                ))}
-                <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                  <button className="page-link"
-                    onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}>Next</button>
-                </li>
-              </ul>
-            </nav>
+                  {[...Array(totalPages)].map((_, i) => (
+                    <li
+                      key={i + 1}
+                      className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}
+                    >
+                      <button className="page-link" onClick={() => setCurrentPage(i + 1)}>
+                        {i + 1}
+                      </button>
+                    </li>
+                  ))}
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

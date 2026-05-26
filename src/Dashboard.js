@@ -15,7 +15,10 @@ import {
 import { motion } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 
-//  Particles: generated once at module level to prevent re-render jitter 
+// ── Font constant (matches ProjectForm.js) ────────────────────────────────────
+const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
+
+// ── Particles: generated once at module level to prevent re-render jitter ─────
 const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   id: i,
   left: `${Math.random() * 100}%`,
@@ -23,7 +26,7 @@ const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   duration: `${(Math.random() * 10 + 5).toFixed(2)}s`
 }));
 
-//  Initial stats shape (single source of truth) 
+// ── Initial stats shape (single source of truth) ──────────────────────────────
 const initialStatsShape = {
   totalProjects: 0,
   completed: 0,
@@ -39,7 +42,7 @@ const initialStatsShape = {
   unpaidCount: 0
 };
 
-//  Themes 
+// ── Themes ────────────────────────────────────────────────────────────────────
 const lightTheme = {
   background: '#f8f9fa',
   cardBackground: '#ffffff',
@@ -79,10 +82,11 @@ const vibrantTheme = {
   gradient: 'linear-gradient(135deg, #f6e05e, #ed64a6)'
 };
 
-//  Styled Components 
+// ── Styled Components ─────────────────────────────────────────────────────────
 const DashboardContainer = styled(motion.div)`
   background: ${props => props.theme.background};
   color: ${props => props.theme.text};
+  font-family: ${MONO};
   min-height: 100vh;
   padding: 2rem;
   transition: all 0.3s ease;
@@ -90,9 +94,10 @@ const DashboardContainer = styled(motion.div)`
 
 const Card = styled(motion.div)`
   background: ${props => props.theme.cardBackground};
-  border-radius: 15px;
+  border-radius: 6px;
   padding: 1.5rem;
   box-shadow: ${props => props.theme.shadow};
+  font-family: ${MONO};
   transition: transform 0.2s ease;
   &:hover {
     transform: translateY(-5px);
@@ -101,9 +106,10 @@ const Card = styled(motion.div)`
 
 const GradientHeader = styled.div`
   background: ${props => props.theme.gradient};
-  padding: 1rem;
-  border-radius: 10px 10px 0 0;
+  padding: 0.85rem 1.25rem;
+  border-radius: 6px 6px 0 0;
   color: ${props => props.theme.text};
+  font-family: ${MONO};
 `;
 
 const ThemeToggle = styled(motion.button)`
@@ -121,6 +127,7 @@ const ThemeToggle = styled(motion.button)`
   justify-content: center;
   cursor: pointer;
   z-index: 1000;
+  font-family: ${MONO};
 `;
 
 const ComparisonIndicator = styled.div`
@@ -128,8 +135,10 @@ const ComparisonIndicator = styled.div`
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: ${MONO};
+  letter-spacing: 0.02em;
 `;
 
 const PercentageChange = styled.span`
@@ -137,7 +146,11 @@ const PercentageChange = styled.span`
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: 4px;
+  font-family: ${MONO};
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   background: ${props =>
     props.positive ? 'rgba(72, 187, 120, 0.2)' :
     props.negative ? 'rgba(245, 101, 101, 0.2)' :
@@ -148,7 +161,7 @@ const PercentageChange = styled.span`
     '#a0aec0'};
 `;
 
-//  Dashboard Component 
+// ── Dashboard Component ───────────────────────────────────────────────────────
 function Dashboard() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -166,7 +179,7 @@ function Dashboard() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#9f7aea', '#ed64a6'];
 
-  //  Helpers 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   const calculatePercentageChange = (current, previous) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
@@ -196,7 +209,7 @@ function Dashboard() {
           {!isPositive && !isNegative && <FaMinus />}
           {Math.abs(percentChange).toFixed(1)}%
         </PercentageChange>
-        <small style={{ opacity: 0.8 }}>
+        <small style={{ opacity: 0.8, fontFamily: MONO, fontSize: '0.68rem', letterSpacing: '0.02em' }}>
           {isCurrency ? formatCurrency(Math.abs(difference)) : Math.abs(difference)}
           {isPositive ? ' more' : isNegative ? ' less' : ' same'}
         </small>
@@ -204,9 +217,7 @@ function Dashboard() {
     );
   };
 
-  //  Stats calculation 
-  // Extracted as a pure function so it can be reused for both main + compare periods.
-  // Fixes: totalPaid now correctly includes fully-paid projects (not just partials).
+  // ── Stats calculation ─────────────────────────────────────────────────────
   const calcStats = (projectsList, currentDate) =>
     projectsList.reduce((acc, project) => {
       acc.totalProjects += 1;
@@ -226,11 +237,9 @@ function Dashboard() {
         acc.overdue += 1;
       }
 
-      // Exclude cancelled projects from financial totals
       if (project.status !== 'cancelled') {
         acc.totalAmount += Number(project.amount) || 0;
         if (project.paymentStatus === 'paid') {
-          // Fully paid: the whole amount has been received
           acc.totalPaid += Number(project.amount) || 0;
           acc.paidCount += 1;
         } else if (project.paymentStatus === 'partial') {
@@ -295,10 +304,9 @@ function Dashboard() {
     else setTheme(lightTheme);
   };
 
-  //  Derived chart data 
+  // ── Derived chart data ────────────────────────────────────────────────────
   const currentDate = new Date();
 
-  // Project trends (last 6 months)
   const projectTrendsMap = projects.reduce((acc, project) => {
     const date = new Date(project.orderDate);
     const key = `${months[date.getMonth()]} ${date.getFullYear()}`;
@@ -322,7 +330,6 @@ function Dashboard() {
     };
   });
 
-  // Project type trend (last 6 months)
   const typeTrendMap = projects.reduce((acc, project) => {
     const date = new Date(project.orderDate);
     const key = `${months[date.getMonth()]} ${date.getFullYear()}`;
@@ -342,7 +349,6 @@ function Dashboard() {
     return entry;
   });
 
-  // Monthly revenue: stacked bar (Paid + Outstanding = total Income)
   const revenueChartData = recentMonths.map(({ month }) => {
     const monthProjects = projects.filter(p => {
       if (p.status === 'cancelled') return false;
@@ -362,21 +368,18 @@ function Dashboard() {
     };
   });
 
-  // Payment status breakdown (respects current filter via stats)
   const paymentStatusData = [
     { name: 'Paid', value: stats.paidCount, color: '#48bb78' },
     { name: 'Partial', value: stats.partialCount, color: '#ecc94b' },
     { name: 'Unpaid', value: stats.unpaidCount, color: '#a0aec0' }
   ].filter(d => d.value > 0);
 
-  // Status distribution for pie/comparison bar
   const statusData = [
     { name: 'Completed', value: stats.completed, compareValue: compareStats?.completed || 0 },
     { name: 'In Progress', value: stats.inProgress, compareValue: compareStats?.inProgress || 0 },
     { name: 'Pending', value: stats.pending, compareValue: compareStats?.pending || 0 }
   ];
 
-  // Recent projects respecting the active filter (not all projects)
   const recentProjects = projects
     .filter(project => {
       const d = new Date(project.orderDate);
@@ -388,28 +391,34 @@ function Dashboard() {
     .sort((a, b) => new Date(b.submissionDate) - new Date(a.submissionDate))
     .slice(0, 10);
 
-  // Custom tooltip for pie charts
+  // Shared tooltip style for recharts
+  const tooltipStyle = {
+    background: theme.cardBackground,
+    color: theme.text,
+    border: `1px solid ${theme.primary}`,
+    borderRadius: '4px',
+    boxShadow: theme.shadow,
+    fontFamily: MONO,
+    fontSize: '0.78rem',
+  };
+
   const CustomPieTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
-        <div style={{
-          background: theme.cardBackground,
-          color: theme.text,
-          padding: '10px',
-          border: `1px solid ${theme.primary}`,
-          borderRadius: '5px',
-          boxShadow: theme.shadow
-        }}>
-          <p style={{ margin: 0 }}>{`${payload[0].name}: ${payload[0].value}`}</p>
+        <div style={tooltipStyle}>
+          <p style={{ margin: 0, padding: '8px 10px' }}>{`${payload[0].name}: ${payload[0].value}`}</p>
         </div>
       );
     }
     return null;
   };
 
+  // Shared axis tick style for recharts
+  const axisStyle = { fontFamily: MONO, fontSize: '0.68rem', letterSpacing: '0.02em' };
+
   if (isLoading) {
     return (
-      <div className="d-flex justify-content-center align-items-center min-vh-100">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', flexDirection: 'column', gap: '0.75rem', background: '#1a1a2e' }}>
         <motion.div
           className="spinner-border text-primary"
           animate={{ rotate: 360 }}
@@ -417,502 +426,86 @@ function Dashboard() {
         >
           <span className="visually-hidden">Loading...</span>
         </motion.div>
+        <p style={{ fontFamily: MONO, fontSize: '0.75rem', color: '#6c757d', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Loading…
+        </p>
       </div>
     );
   }
 
   return (
     <ThemeProvider theme={theme}>
-      <DashboardContainer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* Theme toggle — offset from top to avoid navbar overlap */}
-        <ThemeToggle
-          onClick={toggleTheme}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          {theme === lightTheme ? <FaSun /> : theme === darkTheme ? <FaMoon /> : <FaPalette />}
-        </ThemeToggle>
-
-        {/*  Header  */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <motion.h1
-            className="d-flex align-items-center mb-0"
-            initial={{ y: -20 }}
-            animate={{ y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <FaChartPie className="me-2" /> Project Dashboard
-          </motion.h1>
-          <motion.button
-            className="btn btn-primary d-flex align-items-center gap-2"
-            onClick={() => navigate('/projects/new')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <FaPlus /> Add Project
-          </motion.button>
-        </div>
-
-        {/*  Filters  */}
-        <Card className="mb-4">
-          <GradientHeader>
-            <h5 className="mb-0"><FaFilter className="me-2" /> Filters &amp; Comparison</h5>
-          </GradientHeader>
-          <div className="card-body">
-            <div className="row">
-              {[
-                { label: 'Filter Month', value: filterMonth, setter: setFilterMonth, options: months },
-                { label: 'Filter Year', value: filterYear, setter: setFilterYear, options: years },
-                { label: 'Compare Month', value: compareMonth, setter: setCompareMonth, options: months },
-                { label: 'Compare Year', value: compareYear, setter: setCompareYear, options: years },
-              ].map(({ label, value, setter, options }, index) => (
-                <div className="col-md-3 mb-2" key={index}>
-                  <label className="form-label">{label}</label>
-                  <motion.select
-                    className="form-select"
-                    value={value === null ? '' : value}
-                    onChange={(e) => setter(e.target.value === '' ? null : Number(e.target.value))}
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <option value="">{label.includes('Compare') ? 'None' : 'All'}</option>
-                    {options.map((opt, idx) => (
-                      <option key={idx} value={label.includes('Year') ? opt : idx}>{opt}</option>
-                    ))}
-                  </motion.select>
-                </div>
-              ))}
-            </div>
-
-            {/* Comparison active banner */}
-            {compareStats && (
-              <div className="d-flex justify-content-between align-items-center mt-3 p-2 rounded"
-                style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)' }}
-              >
-                <small>
-                  <strong>Comparing:</strong>{' '}
-                  {filterMonth !== null ? months[filterMonth] : 'All'} {filterYear}
-                  {' '}<span style={{ opacity: 0.6 }}>vs</span>{' '}
-                  {compareMonth !== null ? months[compareMonth] : 'All'} {compareYear}
-                </small>
-                <motion.button
-                  className="btn btn-outline-warning btn-sm"
-                  onClick={() => { setCompareMonth(null); setCompareYear(null); }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <FaTimes className="me-1" /> Clear
-                </motion.button>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {error && (
-          <motion.div className="alert alert-danger mb-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            {error}
-          </motion.div>
-        )}
-
-        {/*  Row 1: Status Metric Cards (6)  */}
-        <div className="row mb-3">
-          {[
-            { icon: FaFolder,            title: 'Total Projects', value: stats.totalProjects, compare: compareStats?.totalProjects, color: theme.primary },
-            { icon: FaTasks,             title: 'Completed',      value: stats.completed,     compare: compareStats?.completed,     color: theme.success },
-            { icon: FaClock,             title: 'In Progress',    value: stats.inProgress,    compare: compareStats?.inProgress,    color: theme.warning },
-            { icon: FaHourglass,         title: 'Pending',        value: stats.pending,       compare: compareStats?.pending,       color: '#6c8fbd' },
-            { icon: FaExclamationTriangle, title: 'Overdue',      value: stats.overdue,       compare: compareStats?.overdue,       color: theme.danger },
-            { icon: FaBan,               title: 'Cancelled',      value: stats.cancelled,     compare: compareStats?.cancelled,     color: theme.secondary },
-          ].map(({ icon: Icon, title, value, compare, color }, index) => (
-            <div className="col-xl-2 col-md-4 col-sm-6 mb-3" key={index}>
-              <Card style={{ background: color, color: '#fff', height: '100%' }}>
-                <div className="d-flex align-items-center">
-                  <Icon size={30} className="me-3" style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h6 style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '4px' }}>{title}</h6>
-                    <motion.h2
-                      style={{ fontSize: '1.75rem', marginBottom: 0 }}
-                      initial={{ scale: 0.9 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      {value}
-                    </motion.h2>
-                    {getComparisonIndicator(value, compare, false)}
-                  </div>
-                </div>
-              </Card>
-            </div>
-          ))}
-        </div>
-
-        {/*  Row 2: Financial Metric Cards (4)  */}
-        <div className="row mb-4">
-          {[
-            {
-              icon: FaMoneyBillWave,
-              title: 'Income Generated',
-              display: formatCurrency(stats.totalAmount),
-              rawValue: stats.totalAmount,
-              compare: compareStats?.totalAmount,
-              color: '#5a7fa8',
-              isCurrency: true
-            },
-            {
-              icon: FaWallet,
-              title: 'Total Paid',
-              display: formatCurrency(stats.totalPaid),
-              rawValue: stats.totalPaid,
-              compare: compareStats?.totalPaid,
-              color: theme.success,
-              isCurrency: true
-            },
-            {
-              icon: FaExclamationTriangle,
-              title: 'Outstanding',
-              display: formatCurrency(Math.max(0, stats.totalAmount - stats.totalPaid)),
-              rawValue: Math.max(0, stats.totalAmount - stats.totalPaid),
-              compare: compareStats ? Math.max(0, compareStats.totalAmount - compareStats.totalPaid) : null,
-              color: '#c0713e',
-              isCurrency: true
-            },
-            {
-              icon: FaFileWord,
-              title: 'Total Words Written',
-              display: stats.totalWords.toLocaleString(),
-              rawValue: stats.totalWords,
-              compare: compareStats?.totalWords,
-              color: '#7b5ea7',
-              isCurrency: false
-            },
-          ].map(({ icon: Icon, title, display, rawValue, compare, color, isCurrency }, index) => (
-            <div className="col-md-3 col-sm-6 mb-3" key={index}>
-              <Card style={{ background: color, color: '#fff', height: '100%' }}>
-                <div className="d-flex align-items-center">
-                  <Icon size={30} className="me-3" style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h6 style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '4px' }}>{title}</h6>
-                    <motion.div
-                      style={{ fontSize: isCurrency ? '1.05rem' : '1.5rem', fontWeight: 'bold', marginBottom: 0 }}
-                      initial={{ scale: 0.9 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      {display}
-                    </motion.div>
-                    {getComparisonIndicator(rawValue, compare, isCurrency)}
-                  </div>
-                </div>
-              </Card>
-            </div>
-          ))}
-        </div>
-
-        {/*  Row 3: Status Distribution + Monthly Revenue  */}
-        <div className="row">
-          {/* Status Distribution */}
-          <div className="col-md-6 mb-4">
-            <Card>
-              <GradientHeader>
-                <h5 className="mb-0">
-                  <FaChartPie className="me-2" /> Project Status Distribution
-                </h5>
-                {compareStats && (
-                  <small>
-                    {filterMonth !== null ? months[filterMonth] : 'All'} {filterYear}
-                    {' vs '}
-                    {compareMonth !== null ? months[compareMonth] : 'All'} {compareYear}
-                  </small>
-                )}
-              </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
-                {stats.totalProjects === 0 ? (
-                  <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-                    No projects for the selected period
-                  </div>
-                ) : compareStats ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={[
-                        { name: 'Completed', Current: stats.completed, Compare: compareStats.completed },
-                        { name: 'In Progress', Current: stats.inProgress, Compare: compareStats.inProgress },
-                        { name: 'Pending', Current: stats.pending, Compare: compareStats.pending },
-                      ]}
-                      margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                      <XAxis dataKey="name" stroke={theme.text} />
-                      <YAxis stroke={theme.text} />
-                      <Tooltip contentStyle={{ background: theme.cardBackground, color: theme.text, border: `1px solid ${theme.primary}`, borderRadius: '8px' }} />
-                      <Legend
-                        verticalAlign="top"
-                        height={36}
-                        formatter={(value) => value === 'Current'
-                          ? `${months[filterMonth] || 'All'} ${filterYear}`
-                          : `${months[compareMonth]} ${compareYear}`
-                        }
-                      />
-                      <Bar dataKey="Current" fill="#00d4ff" radius={[8, 8, 0, 0]} label={{ position: 'top', fill: theme.text }} />
-                      <Bar dataKey="Compare" fill="#48bb78" radius={[8, 8, 0, 0]} label={{ position: 'top', fill: theme.text }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={statusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value, percent }) =>
-                          value > 0 ? `${name}: ${value} (${(percent * 100).toFixed(0)}%)` : ''
-                        }
-                        outerRadius={110}
-                        dataKey="value"
-                        animationBegin={0}
-                        animationDuration={1500}
-                      >
-                        {statusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomPieTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          {/* Monthly Revenue — stacked bar: Paid (green) + Outstanding (red) = total income */}
-          <div className="col-md-6 mb-4">
-            <Card>
-              <GradientHeader>
-                <h5 className="mb-0">
-                  <FaMoneyBillWave className="me-2" /> Monthly Revenue (Last 6 Months)
-                </h5>
-              </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="month" stroke={theme.text} tick={{ fontSize: 11 }} />
-                    <YAxis
-                      stroke={theme.text}
-                      tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
-                    />
-                    <Tooltip
-                      formatter={(value, name) => [`Ksh.${Number(value).toLocaleString()}`, name]}
-                      contentStyle={{ background: theme.cardBackground, color: theme.text, borderRadius: '8px' }}
-                    />
-                    <Legend verticalAlign="bottom" height={36} />
-                    <Bar dataKey="Paid" stackId="revenue" fill="#48bb78" name="Paid" />
-                    <Bar dataKey="Outstanding" stackId="revenue" fill="#f56565" name="Outstanding" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {/*  Row 4: Recent Projects + Payment Breakdown  */}
-        <div className="row">
-          {/* Recent Projects — now respects active filter */}
-          <div className="col-md-8 mb-4">
-            <Card>
-              <GradientHeader className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">
-                  <FaFolder className="me-2" />
-                  Recent Projects
-                  <small className="ms-2" style={{ fontWeight: 'normal', opacity: 0.8 }}>
-                    ({filterMonth !== null ? months[filterMonth] : 'All'} {filterYear})
-                  </small>
-                </h5>
-                <motion.button
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={() => navigate('/projects')}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  View All
-                </motion.button>
-              </GradientHeader>
-              <div className="card-body" style={{ height: '370px', overflowY: 'auto' }}>
-                {recentProjects.length === 0 ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <FaFolder size={32} className="mb-2" style={{ opacity: 0.3 }} />
-                    <span>No projects found for the selected period</span>
-                  </div>
-                ) : (
-                  <table className="table table-hover mb-0">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Topic</th>
-                        <th>Ref Code</th>
-                        <th>Submission</th>
-                        <th>Status</th>
-                        <th>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentProjects.map((project, index) => (
-                        <motion.tr
-                          key={project.id}
-                          onClick={() => navigate(`/projects/edit/${project.id}`)}
-                          style={{ cursor: 'pointer' }}
-                          whileHover={{ backgroundColor: theme.secondary + '20' }}
-                        >
-                          <td>{index + 1}</td>
-                          <td>{project.topic || '—'}</td>
-                          <td>{project.orderRefCode}</td>
-                          <td>{new Date(project.submissionDate).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`badge bg-${
-                              project.status === 'completed' ? 'success' :
-                              project.status === 'in-progress' ? 'warning' :
-                              project.status === 'cancelled' ? 'danger' : 'secondary'
-                            }`}>
-                              {project.status}
-                            </span>
-                          </td>
-                          <td>{formatCurrency(Number(project.amount))}</td>
-                        </motion.tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          {/* Payment Status Breakdown — donut chart */}
-          <div className="col-md-4 mb-4">
-            <Card>
-              <GradientHeader>
-                <h5 className="mb-0"><FaWallet className="me-2" /> Payment Breakdown</h5>
-              </GradientHeader>
-              <div className="card-body" style={{ height: '370px' }}>
-                {paymentStatusData.length === 0 ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <FaWallet size={32} className="mb-2" style={{ opacity: 0.3 }} />
-                    <span>No payment data for the selected period</span>
-                  </div>
-                ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height="72%">
-                      <PieChart>
-                        <Pie
-                          data={paymentStatusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={55}
-                          outerRadius={90}
-                          paddingAngle={3}
-                          dataKey="value"
-                          animationBegin={0}
-                          animationDuration={1200}
-                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
-                        >
-                          {paymentStatusData.map((entry) => (
-                            <Cell key={entry.name} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomPieTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="mt-1">
-                      {paymentStatusData.map((entry) => (
-                        <div key={entry.name} className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="d-flex align-items-center gap-2">
-                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: entry.color, flexShrink: 0 }} />
-                            <span style={{ fontSize: '0.85rem' }}>{entry.name}</span>
-                          </div>
-                          <strong style={{ fontSize: '0.85rem' }}>
-                            {entry.value} project{entry.value !== 1 ? 's' : ''}
-                          </strong>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {/*  Row 5: Project Trends + Type Trend  */}
-        <div className="row">
-          <div className="col-md-8 mb-4">
-            <Card>
-              <GradientHeader>
-                <h5 className="mb-0"><FaChartLine className="me-2" /> Project Trends (Last 6 Months)</h5>
-              </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={recentMonths} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="month" stroke={theme.text} />
-                    <YAxis stroke={theme.text} domain={[0, 'auto']} />
-                    <Tooltip contentStyle={{ background: theme.cardBackground, color: theme.text }} />
-                    <Legend verticalAlign="bottom" height={36} />
-                    <Line type="monotone" dataKey="totalProjects" name="Total" stroke="#00d4ff" strokeWidth={2.5} dot={{ r: 5, fill: '#00d4ff' }} activeDot={{ r: 7 }} />
-                    <Line type="monotone" dataKey="completed" name="Completed" stroke="#48bb78" strokeWidth={2.5} dot={{ r: 5, fill: '#48bb78' }} activeDot={{ r: 7 }} />
-                    <Line type="monotone" dataKey="normal" name="Normal" stroke="#ecc94b" strokeWidth={2.5} dot={{ r: 5, fill: '#ecc94b' }} activeDot={{ r: 7 }} />
-                    <Line type="monotone" dataKey="dissertation" name="Dissertation" stroke="#f56565" strokeWidth={2.5} dot={{ r: 5, fill: '#f56565' }} activeDot={{ r: 7 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-
-          <div className="col-md-4 mb-4">
-            <Card>
-              <GradientHeader>
-                <h5 className="mb-0"><FaChartLine className="me-2" /> Project Type Trend</h5>
-              </GradientHeader>
-              <div className="card-body" style={{ height: '350px' }}>
-                {typeTrendArray.length === 0 ? (
-                  <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-                    No data available
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={typeTrendArray} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                      <XAxis dataKey="month" stroke={theme.text} />
-                      <YAxis stroke={theme.text} domain={[0, 'auto']} />
-                      <Tooltip contentStyle={{ background: theme.cardBackground, color: theme.text }} />
-                      <Legend verticalAlign="bottom" height={36} />
-                      {uniqueTypes.map((type, index) => {
-                        const colorMap = { normal: '#00d4ff', dissertation: '#f56565' };
-                        return (
-                          <Line
-                            key={type}
-                            type="monotone"
-                            dataKey={type}
-                            stroke={colorMap[type] || COLORS[index % COLORS.length]}
-                            name={type.charAt(0).toUpperCase() + type.slice(1)}
-                            strokeWidth={2.5}
-                            dot={{ r: 5, fill: colorMap[type] || COLORS[index % COLORS.length] }}
-                            activeDot={{ r: 7 }}
-                          />
-                        );
-                      })}
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {/*  Particles  */}
+      <>
+        {/* Google Font import */}
         <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+          /* Apply MONO globally within dashboard */
+          .dash-root, .dash-root * {
+            font-family: ${MONO};
+          }
+
+          /* Override Bootstrap form-select / form-label inside dash */
+          .dash-root .form-select,
+          .dash-root .form-label,
+          .dash-root .btn,
+          .dash-root table,
+          .dash-root th,
+          .dash-root td,
+          .dash-root .badge,
+          .dash-root small,
+          .dash-root h1,
+          .dash-root h2,
+          .dash-root h5,
+          .dash-root h6 {
+            font-family: ${MONO} !important;
+          }
+
+          .dash-root h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+          .dash-root h5 { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+          .dash-root h6 { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9; }
+
+          .dash-root .form-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          .dash-root .form-select {
+            font-size: 0.82rem;
+            letter-spacing: 0.02em;
+          }
+
+          .dash-root .btn {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+          }
+
+          .dash-root table th {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          .dash-root table td {
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+          }
+
+          .dash-root .badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+          }
+
+          .dash-root .alert {
+            font-size: 0.8rem;
+            letter-spacing: 0.02em;
+          }
+
           @keyframes float {
             0%   { transform: translateY(0); }
             50%  { transform: translateY(-20vh); }
@@ -928,15 +521,534 @@ function Dashboard() {
             pointer-events: none;
           }
         `}</style>
-        {PARTICLES.map(({ id, left, top, duration }) => (
-          <div
-            key={id}
-            className="particle"
-            style={{ left, top, animation: `float ${duration} infinite` }}
-          />
-        ))}
 
-      </DashboardContainer>
+        <DashboardContainer
+          className="dash-root"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Theme toggle */}
+          <ThemeToggle
+            onClick={toggleTheme}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {theme === lightTheme ? <FaSun /> : theme === darkTheme ? <FaMoon /> : <FaPalette />}
+          </ThemeToggle>
+
+          {/* ── Header ── */}
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <motion.h1
+              className="d-flex align-items-center mb-0"
+              style={{ fontFamily: MONO, fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.01em' }}
+              initial={{ y: -20 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <FaChartPie className="me-2" /> Project Dashboard
+            </motion.h1>
+            <motion.button
+              className="btn btn-primary d-flex align-items-center gap-2"
+              style={{ fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.04em', borderRadius: '4px' }}
+              onClick={() => navigate('/projects/new')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FaPlus /> Add Project
+            </motion.button>
+          </div>
+
+          {/* ── Filters ── */}
+          <Card className="mb-4" style={{ padding: 0, overflow: 'hidden' }}>
+            <GradientHeader>
+              <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <FaFilter className="me-2" /> Filters &amp; Comparison
+              </h5>
+            </GradientHeader>
+            <div className="card-body" style={{ padding: '1.25rem' }}>
+              <div className="row">
+                {[
+                  { label: 'Filter Month', value: filterMonth, setter: setFilterMonth, options: months },
+                  { label: 'Filter Year', value: filterYear, setter: setFilterYear, options: years },
+                  { label: 'Compare Month', value: compareMonth, setter: setCompareMonth, options: months },
+                  { label: 'Compare Year', value: compareYear, setter: setCompareYear, options: years },
+                ].map(({ label, value, setter, options }, index) => (
+                  <div className="col-md-3 mb-2" key={index}>
+                    <label className="form-label" style={{ fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>{label}</label>
+                    <motion.select
+                      className="form-select"
+                      style={{ fontFamily: MONO, fontSize: '0.82rem', letterSpacing: '0.02em', borderRadius: '4px' }}
+                      value={value === null ? '' : value}
+                      onChange={(e) => setter(e.target.value === '' ? null : Number(e.target.value))}
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <option value="">{label.includes('Compare') ? 'None' : 'All'}</option>
+                      {options.map((opt, idx) => (
+                        <option key={idx} value={label.includes('Year') ? opt : idx}>{opt}</option>
+                      ))}
+                    </motion.select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Comparison active banner */}
+              {compareStats && (
+                <div className="d-flex justify-content-between align-items-center mt-3 p-2 rounded"
+                  style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)' }}
+                >
+                  <small style={{ fontFamily: MONO, fontSize: '0.72rem', letterSpacing: '0.02em' }}>
+                    <strong>Comparing:</strong>{' '}
+                    {filterMonth !== null ? months[filterMonth] : 'All'} {filterYear}
+                    {' '}<span style={{ opacity: 0.6 }}>vs</span>{' '}
+                    {compareMonth !== null ? months[compareMonth] : 'All'} {compareYear}
+                  </small>
+                  <motion.button
+                    className="btn btn-outline-warning btn-sm"
+                    style={{ fontFamily: MONO, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', borderRadius: '4px' }}
+                    onClick={() => { setCompareMonth(null); setCompareYear(null); }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <FaTimes className="me-1" /> Clear
+                  </motion.button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {error && (
+            <motion.div className="alert alert-danger mb-4" style={{ fontFamily: MONO, fontSize: '0.8rem', letterSpacing: '0.02em', borderRadius: '4px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {error}
+            </motion.div>
+          )}
+
+          {/* ── Row 1: Status Metric Cards (6) ── */}
+          <div className="row mb-3">
+            {[
+              { icon: FaFolder,              title: 'Total Projects', value: stats.totalProjects, compare: compareStats?.totalProjects, color: theme.primary },
+              { icon: FaTasks,               title: 'Completed',      value: stats.completed,     compare: compareStats?.completed,     color: theme.success },
+              { icon: FaClock,               title: 'In Progress',    value: stats.inProgress,    compare: compareStats?.inProgress,    color: theme.warning },
+              { icon: FaHourglass,           title: 'Pending',        value: stats.pending,       compare: compareStats?.pending,       color: '#6c8fbd' },
+              { icon: FaExclamationTriangle, title: 'Overdue',        value: stats.overdue,       compare: compareStats?.overdue,       color: theme.danger },
+              { icon: FaBan,                 title: 'Cancelled',      value: stats.cancelled,     compare: compareStats?.cancelled,     color: theme.secondary },
+            ].map(({ icon: Icon, title, value, compare, color }, index) => (
+              <div className="col-xl-2 col-md-4 col-sm-6 mb-3" key={index}>
+                <Card style={{ background: color, color: '#fff', height: '100%', borderRadius: '6px' }}>
+                  <div className="d-flex align-items-center">
+                    <Icon size={28} className="me-3" style={{ flexShrink: 0, opacity: 0.9 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h6 style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.85, marginBottom: '4px' }}>{title}</h6>
+                      <motion.div
+                        style={{ fontFamily: MONO, fontSize: '1.75rem', fontWeight: 700, marginBottom: 0, lineHeight: 1 }}
+                        initial={{ scale: 0.9 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 300 }}
+                      >
+                        {value}
+                      </motion.div>
+                      {getComparisonIndicator(value, compare, false)}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Row 2: Financial Metric Cards (4) ── */}
+          <div className="row mb-4">
+            {[
+              {
+                icon: FaMoneyBillWave,
+                title: 'Income Generated',
+                display: formatCurrency(stats.totalAmount),
+                rawValue: stats.totalAmount,
+                compare: compareStats?.totalAmount,
+                color: '#5a7fa8',
+                isCurrency: true
+              },
+              {
+                icon: FaWallet,
+                title: 'Total Paid',
+                display: formatCurrency(stats.totalPaid),
+                rawValue: stats.totalPaid,
+                compare: compareStats?.totalPaid,
+                color: theme.success,
+                isCurrency: true
+              },
+              {
+                icon: FaExclamationTriangle,
+                title: 'Outstanding',
+                display: formatCurrency(Math.max(0, stats.totalAmount - stats.totalPaid)),
+                rawValue: Math.max(0, stats.totalAmount - stats.totalPaid),
+                compare: compareStats ? Math.max(0, compareStats.totalAmount - compareStats.totalPaid) : null,
+                color: '#c0713e',
+                isCurrency: true
+              },
+              {
+                icon: FaFileWord,
+                title: 'Total Words Written',
+                display: stats.totalWords.toLocaleString(),
+                rawValue: stats.totalWords,
+                compare: compareStats?.totalWords,
+                color: '#7b5ea7',
+                isCurrency: false
+              },
+            ].map(({ icon: Icon, title, display, rawValue, compare, color, isCurrency }, index) => (
+              <div className="col-md-3 col-sm-6 mb-3" key={index}>
+                <Card style={{ background: color, color: '#fff', height: '100%', borderRadius: '6px' }}>
+                  <div className="d-flex align-items-center">
+                    <Icon size={28} className="me-3" style={{ flexShrink: 0, opacity: 0.9 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h6 style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.85, marginBottom: '4px' }}>{title}</h6>
+                      <motion.div
+                        style={{ fontFamily: MONO, fontSize: isCurrency ? '1rem' : '1.5rem', fontWeight: 700, marginBottom: 0, lineHeight: 1.2 }}
+                        initial={{ scale: 0.9 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 300 }}
+                      >
+                        {display}
+                      </motion.div>
+                      {getComparisonIndicator(rawValue, compare, isCurrency)}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Row 3: Status Distribution + Monthly Revenue ── */}
+          <div className="row">
+            {/* Status Distribution */}
+            <div className="col-md-6 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader>
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaChartPie className="me-2" /> Project Status Distribution
+                  </h5>
+                  {compareStats && (
+                    <small style={{ fontFamily: MONO, fontSize: '0.65rem', letterSpacing: '0.04em', opacity: 0.8 }}>
+                      {filterMonth !== null ? months[filterMonth] : 'All'} {filterYear}
+                      {' vs '}
+                      {compareMonth !== null ? months[compareMonth] : 'All'} {compareYear}
+                    </small>
+                  )}
+                </GradientHeader>
+                <div className="card-body" style={{ height: '350px', padding: '1rem' }}>
+                  {stats.totalProjects === 0 ? (
+                    <div className="d-flex align-items-center justify-content-center h-100" style={{ color: theme.secondary, fontFamily: MONO, fontSize: '0.78rem', letterSpacing: '0.04em' }}>
+                      No projects for the selected period
+                    </div>
+                  ) : compareStats ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={[
+                          { name: 'Completed', Current: stats.completed, Compare: compareStats.completed },
+                          { name: 'In Progress', Current: stats.inProgress, Compare: compareStats.inProgress },
+                          { name: 'Pending', Current: stats.pending, Compare: compareStats.pending },
+                        ]}
+                        margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                        <XAxis dataKey="name" stroke={theme.text} tick={axisStyle} />
+                        <YAxis stroke={theme.text} tick={axisStyle} />
+                        <Tooltip contentStyle={tooltipStyle} />
+                        <Legend
+                          verticalAlign="top"
+                          height={36}
+                          wrapperStyle={{ fontFamily: MONO, fontSize: '0.72rem', letterSpacing: '0.04em' }}
+                          formatter={(value) => value === 'Current'
+                            ? `${months[filterMonth] || 'All'} ${filterYear}`
+                            : `${months[compareMonth]} ${compareYear}`
+                          }
+                        />
+                        <Bar dataKey="Current" fill="#00d4ff" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: theme.text, fontFamily: MONO, fontSize: '0.7rem' }} />
+                        <Bar dataKey="Compare" fill="#48bb78" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: theme.text, fontFamily: MONO, fontSize: '0.7rem' }} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={statusData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, value, percent }) =>
+                            value > 0 ? `${name}: ${value} (${(percent * 100).toFixed(0)}%)` : ''
+                          }
+                          outerRadius={110}
+                          dataKey="value"
+                          animationBegin={0}
+                          animationDuration={1500}
+                        >
+                          {statusData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomPieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Monthly Revenue */}
+            <div className="col-md-6 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader>
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaMoneyBillWave className="me-2" /> Monthly Revenue (Last 6 Months)
+                  </h5>
+                </GradientHeader>
+                <div className="card-body" style={{ height: '350px', padding: '1rem' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis dataKey="month" stroke={theme.text} tick={axisStyle} />
+                      <YAxis
+                        stroke={theme.text}
+                        tick={axisStyle}
+                        tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => [`Ksh.${Number(value).toLocaleString()}`, name]}
+                        contentStyle={tooltipStyle}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        wrapperStyle={{ fontFamily: MONO, fontSize: '0.72rem', letterSpacing: '0.04em' }}
+                      />
+                      <Bar dataKey="Paid" stackId="revenue" fill="#48bb78" name="Paid" />
+                      <Bar dataKey="Outstanding" stackId="revenue" fill="#f56565" name="Outstanding" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* ── Row 4: Recent Projects + Payment Breakdown ── */}
+          <div className="row">
+            {/* Recent Projects */}
+            <div className="col-md-8 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader className="d-flex justify-content-between align-items-center">
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaFolder className="me-2" />
+                    Recent Projects
+                    <span className="ms-2" style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 400, opacity: 0.75, textTransform: 'none', letterSpacing: '0.02em' }}>
+                      ({filterMonth !== null ? months[filterMonth] : 'All'} {filterYear})
+                    </span>
+                  </h5>
+                  <motion.button
+                    className="btn btn-outline-primary btn-sm"
+                    style={{ fontFamily: MONO, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', borderRadius: '4px' }}
+                    onClick={() => navigate('/projects')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    View All
+                  </motion.button>
+                </GradientHeader>
+                <div className="card-body" style={{ height: '370px', overflowY: 'auto', padding: '0.85rem 1.25rem' }}>
+                  {recentProjects.length === 0 ? (
+                    <div className="d-flex flex-column align-items-center justify-content-center h-100" style={{ color: theme.secondary, fontFamily: MONO, fontSize: '0.78rem', letterSpacing: '0.04em' }}>
+                      <FaFolder size={32} className="mb-2" style={{ opacity: 0.3 }} />
+                      <span>No projects found for the selected period</span>
+                    </div>
+                  ) : (
+                    <table className="table table-hover mb-0" style={{ fontFamily: MONO }}>
+                      <thead>
+                        <tr>
+                          {['#', 'Topic', 'Ref Code', 'Submission', 'Status', 'Amount'].map((h) => (
+                            <th key={h} style={{ fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', paddingBottom: '0.5rem' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentProjects.map((project, index) => (
+                          <motion.tr
+                            key={project.id}
+                            onClick={() => navigate(`/projects/edit/${project.id}`)}
+                            style={{ cursor: 'pointer', fontFamily: MONO }}
+                            whileHover={{ backgroundColor: theme.secondary + '20' }}
+                          >
+                            <td style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.02em' }}>{index + 1}</td>
+                            <td style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.02em' }}>{project.topic || '—'}</td>
+                            <td style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.04em' }}>{project.orderRefCode}</td>
+                            <td style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.02em' }}>{new Date(project.submissionDate).toLocaleDateString()}</td>
+                            <td>
+                              <span
+                                className={`badge bg-${
+                                  project.status === 'completed' ? 'success' :
+                                  project.status === 'in-progress' ? 'warning' :
+                                  project.status === 'cancelled' ? 'danger' : 'secondary'
+                                }`}
+                                style={{ fontFamily: MONO, fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', borderRadius: '4px' }}
+                              >
+                                {project.status}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.02em' }}>{formatCurrency(Number(project.amount))}</td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Payment Status Breakdown */}
+            <div className="col-md-4 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader>
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaWallet className="me-2" /> Payment Breakdown
+                  </h5>
+                </GradientHeader>
+                <div className="card-body" style={{ height: '370px', padding: '1rem' }}>
+                  {paymentStatusData.length === 0 ? (
+                    <div className="d-flex flex-column align-items-center justify-content-center h-100" style={{ color: theme.secondary, fontFamily: MONO, fontSize: '0.78rem', letterSpacing: '0.04em' }}>
+                      <FaWallet size={32} className="mb-2" style={{ opacity: 0.3 }} />
+                      <span>No payment data for the selected period</span>
+                    </div>
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height="72%">
+                        <PieChart>
+                          <Pie
+                            data={paymentStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={90}
+                            paddingAngle={3}
+                            dataKey="value"
+                            animationBegin={0}
+                            animationDuration={1200}
+                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                            labelLine={false}
+                          >
+                            {paymentStatusData.map((entry) => (
+                              <Cell key={entry.name} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomPieTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="mt-1">
+                        {paymentStatusData.map((entry) => (
+                          <div key={entry.name} className="d-flex justify-content-between align-items-center mb-2">
+                            <div className="d-flex align-items-center gap-2">
+                              <div style={{ width: 10, height: 10, borderRadius: '2px', background: entry.color, flexShrink: 0 }} />
+                              <span style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.04em' }}>{entry.name}</span>
+                            </div>
+                            <strong style={{ fontFamily: MONO, fontSize: '0.75rem', letterSpacing: '0.04em' }}>
+                              {entry.value} project{entry.value !== 1 ? 's' : ''}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* ── Row 5: Project Trends + Type Trend ── */}
+          <div className="row">
+            <div className="col-md-8 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader>
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaChartLine className="me-2" /> Project Trends (Last 6 Months)
+                  </h5>
+                </GradientHeader>
+                <div className="card-body" style={{ height: '350px', padding: '1rem' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={recentMonths} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                      <XAxis dataKey="month" stroke={theme.text} tick={axisStyle} />
+                      <YAxis stroke={theme.text} tick={axisStyle} domain={[0, 'auto']} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        wrapperStyle={{ fontFamily: MONO, fontSize: '0.72rem', letterSpacing: '0.04em' }}
+                      />
+                      <Line type="monotone" dataKey="totalProjects" name="Total"        stroke="#00d4ff" strokeWidth={2.5} dot={{ r: 5, fill: '#00d4ff' }} activeDot={{ r: 7 }} />
+                      <Line type="monotone" dataKey="completed"     name="Completed"    stroke="#48bb78" strokeWidth={2.5} dot={{ r: 5, fill: '#48bb78' }} activeDot={{ r: 7 }} />
+                      <Line type="monotone" dataKey="normal"        name="Normal"       stroke="#ecc94b" strokeWidth={2.5} dot={{ r: 5, fill: '#ecc94b' }} activeDot={{ r: 7 }} />
+                      <Line type="monotone" dataKey="dissertation"  name="Dissertation" stroke="#f56565" strokeWidth={2.5} dot={{ r: 5, fill: '#f56565' }} activeDot={{ r: 7 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
+
+            <div className="col-md-4 mb-4">
+              <Card style={{ padding: 0, overflow: 'hidden' }}>
+                <GradientHeader>
+                  <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <FaChartLine className="me-2" /> Project Type Trend
+                  </h5>
+                </GradientHeader>
+                <div className="card-body" style={{ height: '350px', padding: '1rem' }}>
+                  {typeTrendArray.length === 0 ? (
+                    <div className="d-flex align-items-center justify-content-center h-100" style={{ color: theme.secondary, fontFamily: MONO, fontSize: '0.78rem', letterSpacing: '0.04em' }}>
+                      No data available
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={typeTrendArray} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                        <XAxis dataKey="month" stroke={theme.text} tick={axisStyle} />
+                        <YAxis stroke={theme.text} tick={axisStyle} domain={[0, 'auto']} />
+                        <Tooltip contentStyle={tooltipStyle} />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={36}
+                          wrapperStyle={{ fontFamily: MONO, fontSize: '0.72rem', letterSpacing: '0.04em' }}
+                        />
+                        {uniqueTypes.map((type, index) => {
+                          const colorMap = { normal: '#00d4ff', dissertation: '#f56565' };
+                          return (
+                            <Line
+                              key={type}
+                              type="monotone"
+                              dataKey={type}
+                              stroke={colorMap[type] || COLORS[index % COLORS.length]}
+                              name={type.charAt(0).toUpperCase() + type.slice(1)}
+                              strokeWidth={2.5}
+                              dot={{ r: 5, fill: colorMap[type] || COLORS[index % COLORS.length] }}
+                              activeDot={{ r: 7 }}
+                            />
+                          );
+                        })}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* ── Particles ── */}
+          {PARTICLES.map(({ id, left, top, duration }) => (
+            <div
+              key={id}
+              className="particle"
+              style={{ left, top, animation: `float ${duration} infinite` }}
+            />
+          ))}
+
+        </DashboardContainer>
+      </>
     </ThemeProvider>
   );
 }

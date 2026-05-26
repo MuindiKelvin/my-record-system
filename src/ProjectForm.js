@@ -3,745 +3,589 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-// Pricing modes
-// 'word_count' – classic: words + CPP drive the cost
-// 'flat_rate'  – user enters a direct negotiated/agreed price
+const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
+
+// ── Primitives ────────────────────────────────────────────────────────────────
+
+function FL({ children }) {
+  return (
+    <label style={{
+      display: 'block', fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700,
+      letterSpacing: '0.08em', textTransform: 'uppercase', color: '#495057',
+      marginBottom: '0.35rem',
+    }}>{children}</label>
+  );
+}
+
+const inputBase = {
+  width: '100%', fontFamily: MONO, fontSize: '0.82rem',
+  background: '#fff', border: '1px solid #ced4da', borderRadius: '4px',
+  color: '#212529', padding: '0.42rem 0.75rem', outline: 'none',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
+};
+
+function FI({ style, ...p }) {
+  return (
+    <input style={{ ...inputBase, ...style }}
+      onFocus={e => { e.target.style.borderColor = '#86b7fe'; e.target.style.boxShadow = '0 0 0 3px rgba(13,110,253,0.15)'; }}
+      onBlur={e => { e.target.style.borderColor = '#ced4da'; e.target.style.boxShadow = 'none'; }}
+      {...p} />
+  );
+}
+
+function FS({ style, children, ...p }) {
+  return (
+    <select
+      style={{
+        ...inputBase, appearance: 'none', cursor: 'pointer', paddingRight: '2rem',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236c757d' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', ...style,
+      }}
+      onFocus={e => { e.target.style.borderColor = '#86b7fe'; e.target.style.boxShadow = '0 0 0 3px rgba(13,110,253,0.15)'; }}
+      onBlur={e => { e.target.style.borderColor = '#ced4da'; e.target.style.boxShadow = 'none'; }}
+      {...p}
+    >{children}</select>
+  );
+}
+
+function FTA({ style, ...p }) {
+  return (
+    <textarea style={{ ...inputBase, resize: 'vertical', ...style }}
+      onFocus={e => { e.target.style.borderColor = '#86b7fe'; e.target.style.boxShadow = '0 0 0 3px rgba(13,110,253,0.15)'; }}
+      onBlur={e => { e.target.style.borderColor = '#ced4da'; e.target.style.boxShadow = 'none'; }}
+      {...p} />
+  );
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700,
+      letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6c757d',
+      borderBottom: '1px solid #dee2e6', paddingBottom: '0.4rem', marginBottom: '0.85rem',
+    }}>{children}</div>
+  );
+}
+
+function Divider() {
+  return <div style={{ height: '1px', background: '#dee2e6', margin: '0.85rem 0' }} />;
+}
+
+function Toggle({ checked, onChange, id, label }) {
+  return (
+    <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
+      <div style={{ position: 'relative', width: '36px', height: '20px', flexShrink: 0 }}>
+        <input type="checkbox" id={id} checked={checked} onChange={onChange}
+          style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '10px',
+          background: checked ? '#0d6efd' : '#dee2e6',
+          transition: 'background 0.2s',
+        }} />
+        <div style={{
+          position: 'absolute', top: '3px', left: checked ? '19px' : '3px',
+          width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s',
+        }} />
+      </div>
+      <span style={{ fontFamily: MONO, fontSize: '0.82rem', color: '#212529', letterSpacing: '0.02em' }}>{label}</span>
+    </label>
+  );
+}
+
+function BRow({ label, value, color, bold }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontFamily: MONO, fontSize: '0.8rem', color: color || '#495057', fontWeight: bold ? 700 : 400, padding: '0.2rem 0', gap: '0.5rem' }}>
+      <span>{label}</span><span>{value}</span>
+    </div>
+  );
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 function ProjectForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
-  //  Pricing mode toggle 
   const [pricingMode, setPricingMode] = useState('word_count');
 
-  const initialFormState = {
+  const init = {
     orderDate: new Date().toISOString().split('T')[0],
     submissionDate: new Date().toISOString().split('T')[0],
-    orderRefCode: '',
-    orderType: 'normal',
-    topic: '',
-    // word-count mode fields
-    words: '',
-    cpp: '',
-    // flat-rate mode field
-    flatRate: '',
-    // add-ons
-    hasCode: false,
-    codeAmount: '',
-    hasPresentation: false,
-    slideCount: '',
-    // payment
-    paymentStatus: 'unpaid',
-    amountPaid: '',
-    // status
-    status: 'pending',
-    priority: 'medium',
-    notes: ''
+    orderRefCode: '', orderType: 'normal', topic: '',
+    words: '', cpp: '', flatRate: '',
+    hasCode: false, codeAmount: '',
+    hasPresentation: false, slideCount: '',
+    paymentStatus: 'unpaid', amountPaid: '',
+    status: 'pending', priority: 'medium', notes: '',
   };
+  const [fd, setFd] = useState(init);
 
-  const [formData, setFormData] = useState(initialFormState);
-
-  //  Load existing project  
   useEffect(() => {
     if (!id) return;
-
-    const fetchProject = async () => {
-      setIsLoading(true);
+    setIsLoading(true);
+    (async () => {
       try {
-        const docRef = doc(db, 'projects', id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-
-          // Detect which pricing mode was used when this project was saved
-          const savedMode = data.pricingMode || (data.flatRate ? 'flat_rate' : 'word_count');
-          setPricingMode(savedMode);
-
-          setFormData({
-            ...data,
-            orderDate: data.orderDate || new Date().toISOString().split('T')[0],
-            submissionDate: data.submissionDate || new Date().toISOString().split('T')[0],
-            orderType: data.orderType || 'normal',
-            words: data.words != null ? Math.round(data.words).toString() : '',
-            cpp: data.cpp?.toString() || '',
-            flatRate: data.flatRate?.toString() || '',
-            codeAmount: data.codeAmount?.toString() || '',
-            hasCode: Boolean(data.hasCode),
-            hasPresentation: Boolean(data.hasPresentation),
-            slideCount: data.slideCount != null ? Math.round(data.slideCount).toString() : '',
-            paymentStatus: data.paymentStatus || 'unpaid',
-            amountPaid: data.amountPaid?.toString() || '',
-            status: data.status || 'pending',
-            priority: data.priority || 'medium',
-            notes: data.notes || ''
+        const snap = await getDoc(doc(db, 'projects', id));
+        if (snap.exists()) {
+          const d = snap.data();
+          setPricingMode(d.pricingMode || (d.flatRate ? 'flat_rate' : 'word_count'));
+          setFd({
+            ...d,
+            orderDate: d.orderDate || init.orderDate,
+            submissionDate: d.submissionDate || init.submissionDate,
+            orderType: d.orderType || 'normal',
+            words: d.words != null ? Math.round(d.words).toString() : '',
+            cpp: d.cpp?.toString() || '',
+            flatRate: d.flatRate?.toString() || '',
+            codeAmount: d.codeAmount?.toString() || '',
+            hasCode: Boolean(d.hasCode),
+            hasPresentation: Boolean(d.hasPresentation),
+            slideCount: d.slideCount != null ? Math.round(d.slideCount).toString() : '',
+            paymentStatus: d.paymentStatus || 'unpaid',
+            amountPaid: d.amountPaid?.toString() || '',
+            status: d.status || 'pending',
+            priority: d.priority || 'medium',
+            notes: d.notes || '',
           });
-        } else {
-          setError('Project not found');
-          navigate('/projects');
-        }
-      } catch (err) {
-        setError('Error loading project: ' + err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        } else { setError('Project not found'); navigate('/projects'); }
+      } catch (e) { setError('Error loading: ' + e.message); }
+      finally { setIsLoading(false); }
+    })();
+  }, [id]);
 
-    fetchProject();
-  }, [id, navigate]);
-
-  //  Field change handler 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
-    setFormData(prev => {
-      const newData = {
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      };
-
-      if (name === 'hasCode' && !checked) newData.codeAmount = '';
-      if (name === 'hasPresentation' && !checked) newData.slideCount = '';
-      if (name === 'paymentStatus' && value === 'paid') newData.amountPaid = '';
-
-      return newData;
+    setFd(prev => {
+      const n = { ...prev, [name]: type === 'checkbox' ? checked : value };
+      if (name === 'hasCode' && !checked) n.codeAmount = '';
+      if (name === 'hasPresentation' && !checked) n.slideCount = '';
+      if (name === 'paymentStatus' && value === 'paid') n.amountPaid = '';
+      return n;
     });
-
     setError('');
   };
 
-  // Switch pricing mode and clear the other mode's fields to avoid stale data
-  const handlePricingModeChange = (mode) => {
+  const handleModeChange = (mode) => {
     setPricingMode(mode);
-    setFormData(prev => ({
-      ...prev,
-      words: '',
-      cpp: '',
-      flatRate: ''
-    }));
+    setFd(prev => ({ ...prev, words: '', cpp: '', flatRate: '' }));
     setError('');
   };
 
-  //  Cost calculations 
-  const calculatePresentationCost = () => {
-    const slideCount = parseFloat(formData.slideCount) || 0;
-    if (slideCount === 0) return 0;
-    const costPerSlide = 400 / 3; // Ksh.400 per 3 slides
-    return slideCount * costPerSlide;
+  const calcPPT = () => (parseFloat(fd.slideCount) || 0) * (400 / 3);
+
+  const calcAmount = () => {
+    let base = pricingMode === 'word_count'
+      ? ((parseFloat(fd.words) || 0) / 275) * (parseFloat(fd.cpp) || 0)
+      : (parseFloat(fd.flatRate) || 0);
+    const code = fd.hasCode ? parseFloat(fd.codeAmount) || 0 : 0;
+    const ppt  = fd.hasPresentation ? calcPPT() : 0;
+    const t = base + code + ppt;
+    return isNaN(t) ? '0.00' : t.toFixed(2);
   };
 
-  const calculateAmount = () => {
-    let base = 0;
+  const calcBalance = () => (parseFloat(calcAmount()) - (parseFloat(fd.amountPaid) || 0)).toFixed(2);
 
+  const validate = () => {
+    const errs = [];
+    if (!fd.orderDate) errs.push('Order date required');
+    if (!fd.submissionDate) errs.push('Submission date required');
+    if (!fd.orderRefCode) errs.push('Reference code required');
+    if (!fd.orderType) errs.push('Order type required');
     if (pricingMode === 'word_count') {
-      const words = parseFloat(formData.words) || 0;
-      const cpp = parseFloat(formData.cpp) || 0;
-      base = words > 0 ? (words / 275) * cpp : 0;
+      const hw = fd.words && parseFloat(fd.words) > 0;
+      const hc = fd.hasCode && fd.codeAmount;
+      const hp = fd.hasPresentation && fd.slideCount;
+      if (!hw && !hc && !hp) errs.push('Provide word count, code amount, or slide count');
+      if (hw && (!fd.cpp || parseFloat(fd.cpp) <= 0)) errs.push('CPP required when word count is set');
     } else {
-      // flat_rate
-      base = parseFloat(formData.flatRate) || 0;
+      const hf = fd.flatRate && parseFloat(fd.flatRate) > 0;
+      const hc = fd.hasCode && fd.codeAmount;
+      const hp = fd.hasPresentation && fd.slideCount;
+      if (!hf && !hc && !hp) errs.push('Enter flat rate, code amount, or slide count');
     }
-
-    const codeAmount = formData.hasCode ? parseFloat(formData.codeAmount) || 0 : 0;
-    const presentationCost = formData.hasPresentation ? calculatePresentationCost() : 0;
-
-    const total = base + codeAmount + presentationCost;
-    return isNaN(total) ? '0.00' : total.toFixed(2);
+    if (fd.hasCode && (!fd.codeAmount || parseFloat(fd.codeAmount) < 0)) errs.push('Valid code amount required');
+    if (fd.hasPresentation && (!fd.slideCount || parseFloat(fd.slideCount) < 0)) errs.push('Valid slide count required');
+    if (fd.paymentStatus === 'partial' && (!fd.amountPaid || parseFloat(fd.amountPaid) <= 0)) errs.push('Amount paid required for partial payment');
+    if (fd.amountPaid && parseFloat(fd.amountPaid) > parseFloat(calcAmount())) errs.push('Amount paid exceeds total');
+    return errs;
   };
 
-  const calculateBalance = () => {
-    const totalAmount = parseFloat(calculateAmount());
-    const amountPaid = parseFloat(formData.amountPaid) || 0;
-    return (totalAmount - amountPaid).toFixed(2);
-  };
-
-  //  Validation 
-  const validateForm = () => {
-    const errors = [];
-
-    if (!formData.orderDate) errors.push('Order date is required');
-    if (!formData.submissionDate) errors.push('Submission date is required');
-    if (!formData.orderRefCode) errors.push('Order reference code is required');
-    if (!formData.orderType) errors.push('Order type is required');
-
-    if (pricingMode === 'word_count') {
-      const hasWords = formData.words && parseFloat(formData.words) > 0;
-      const hasCode = formData.hasCode && formData.codeAmount;
-      const hasPresentation = formData.hasPresentation && formData.slideCount;
-
-      if (!hasWords && !hasCode && !hasPresentation) {
-        errors.push('Provide a word count, code amount, or presentation slide count');
-      }
-      if (hasWords && (!formData.cpp || parseFloat(formData.cpp) <= 0)) {
-        errors.push('A valid cost per page is required when a word count is specified');
-      }
-    } else {
-      // flat_rate
-      const hasFlat = formData.flatRate && parseFloat(formData.flatRate) > 0;
-      const hasCode = formData.hasCode && formData.codeAmount;
-      const hasPresentation = formData.hasPresentation && formData.slideCount;
-
-      if (!hasFlat && !hasCode && !hasPresentation) {
-        errors.push('Enter a flat rate amount, code amount, or presentation slide count');
-      }
-    }
-
-    if (formData.hasCode && (!formData.codeAmount || parseFloat(formData.codeAmount) < 0)) {
-      errors.push('A valid code amount is required when code is included');
-    }
-    if (formData.hasPresentation && (!formData.slideCount || parseFloat(formData.slideCount) < 0)) {
-      errors.push('A valid slide count is required when a presentation is included');
-    }
-    if (formData.paymentStatus === 'partial' && (!formData.amountPaid || parseFloat(formData.amountPaid) <= 0)) {
-      errors.push('Amount paid is required for partial payment');
-    }
-    if (formData.amountPaid && parseFloat(formData.amountPaid) > parseFloat(calculateAmount())) {
-      errors.push('Amount paid cannot exceed the total amount');
-    }
-
-    return errors;
-  };
-
-  //  Submit  
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join('. '));
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
+    const errs = validate();
+    if (errs.length) { setError(errs.join('. ')); return; }
+    setIsLoading(true); setError('');
     try {
-      const projectData = {
-        // Descriptive fields — stored exactly as the user typed them
-        orderDate: formData.orderDate,
-        submissionDate: formData.submissionDate,
-        orderRefCode: formData.orderRefCode,
-        orderType: formData.orderType,
-        topic: formData.topic,
-        status: formData.status,
-        priority: formData.priority,
-        notes: formData.notes,
-        paymentStatus: formData.paymentStatus,
-
-        // Pricing mode
-        pricingMode,
-
-        // Word-count fields — only meaningful in word_count mode
-        words: pricingMode === 'word_count' && parseFloat(formData.words) > 0
-          ? Math.round(parseFloat(formData.words))
-          : 0,
-        cpp: pricingMode === 'word_count' && parseFloat(formData.cpp) > 0
-          ? parseFloat(formData.cpp)
-          : 0,
-
-        // Flat-rate field — only meaningful in flat_rate mode
-        flatRate: pricingMode === 'flat_rate' && parseFloat(formData.flatRate) > 0
-          ? parseFloat(formData.flatRate)
-          : 0,
-
-        // Add-ons
-        hasCode: Boolean(formData.hasCode),
-        codeAmount: formData.hasCode && parseFloat(formData.codeAmount) > 0
-          ? parseFloat(formData.codeAmount)
-          : 0,
-        hasPresentation: Boolean(formData.hasPresentation),
-        slideCount: formData.hasPresentation && parseFloat(formData.slideCount) > 0
-          ? Math.round(parseFloat(formData.slideCount))
-          : 0,
-
-        // Payment
-        amountPaid: formData.paymentStatus === 'partial' && parseFloat(formData.amountPaid) > 0
-          ? parseFloat(formData.amountPaid)
-          : 0,
-
-        // Computed totals
-        amount: parseFloat(calculateAmount()),
-        balance: formData.paymentStatus === 'partial'
-          ? parseFloat(calculateBalance())
-          : 0,
-
-        lastUpdated: new Date().toISOString()
+      const pd = {
+        orderDate: fd.orderDate, submissionDate: fd.submissionDate,
+        orderRefCode: fd.orderRefCode, orderType: fd.orderType, topic: fd.topic,
+        status: fd.status, priority: fd.priority, notes: fd.notes,
+        paymentStatus: fd.paymentStatus, pricingMode,
+        words: pricingMode === 'word_count' && parseFloat(fd.words) > 0 ? Math.round(parseFloat(fd.words)) : 0,
+        cpp: pricingMode === 'word_count' && parseFloat(fd.cpp) > 0 ? parseFloat(fd.cpp) : 0,
+        flatRate: pricingMode === 'flat_rate' && parseFloat(fd.flatRate) > 0 ? parseFloat(fd.flatRate) : 0,
+        hasCode: Boolean(fd.hasCode),
+        codeAmount: fd.hasCode && parseFloat(fd.codeAmount) > 0 ? parseFloat(fd.codeAmount) : 0,
+        hasPresentation: Boolean(fd.hasPresentation),
+        slideCount: fd.hasPresentation && parseFloat(fd.slideCount) > 0 ? Math.round(parseFloat(fd.slideCount)) : 0,
+        amountPaid: fd.paymentStatus === 'partial' && parseFloat(fd.amountPaid) > 0 ? parseFloat(fd.amountPaid) : 0,
+        amount: parseFloat(calcAmount()),
+        balance: fd.paymentStatus === 'partial' ? parseFloat(calcBalance()) : 0,
+        lastUpdated: new Date().toISOString(),
       };
-
       if (id) {
-        // Preserve carry-forward sentinels if they exist on the original document
-        if (formData.isCarryForward) projectData.isCarryForward = true;
-        if (formData.carryForwardFromId) projectData.carryForwardFromId = formData.carryForwardFromId;
-        await updateDoc(doc(db, 'projects', id), projectData);
+        if (fd.isCarryForward) pd.isCarryForward = true;
+        if (fd.carryForwardFromId) pd.carryForwardFromId = fd.carryForwardFromId;
+        await updateDoc(doc(db, 'projects', id), pd);
       } else {
-        projectData.createdAt = new Date().toISOString();
-        await addDoc(collection(db, 'projects'), projectData);
+        pd.createdAt = new Date().toISOString();
+        await addDoc(collection(db, 'projects'), pd);
       }
-
       navigate('/projects');
-    } catch (err) {
-      setError('Error saving project: ' + err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { setError('Error saving: ' + e.message); }
+    finally { setIsLoading(false); }
   };
 
-  // ─── Loading state ───────────────────────────────────────────────────────────
-  if (isLoading) {
-    return (
-      <div className="d-flex justify-content-center p-5">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
+  if (isLoading) return (
+    <div style={{ minHeight: '100vh', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="spinner-border text-primary" role="status" style={{ width: '2rem', height: '2rem' }}>
+        <span className="visually-hidden">Loading...</span>
       </div>
-    );
-  }
+      <p style={{ fontFamily: MONO, fontSize: '0.75rem', color: '#6c757d', margin: 0 }}>Loading…</p>
+    </div>
+  );
 
-  //  Derived display values 
   const writingCost = pricingMode === 'word_count'
-    ? ((parseFloat(formData.words) || 0) / 275) * (parseFloat(formData.cpp) || 0)
-    : parseFloat(formData.flatRate) || 0;
+    ? ((parseFloat(fd.words) || 0) / 275) * (parseFloat(fd.cpp) || 0)
+    : (parseFloat(fd.flatRate) || 0);
+  const totalAmt = parseFloat(calcAmount());
+  const hasBreakdown =
+    (pricingMode === 'word_count' && (parseFloat(fd.words) || 0) > 0) ||
+    (pricingMode === 'flat_rate' && (parseFloat(fd.flatRate) || 0) > 0) ||
+    (fd.hasCode && (parseFloat(fd.codeAmount) || 0) > 0) ||
+    (fd.hasPresentation && (parseFloat(fd.slideCount) || 0) > 0);
 
-  //  Render 
+  const priColors = { low: '#198754', medium: '#fd7e14', high: '#dc3545', urgent: '#9b0000' };
+  const priColor = priColors[fd.priority] || '#6c757d';
+
+  const G2 = ({ children, style }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', ...style }}>{children}</div>
+  );
+  const G3 = ({ children }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>{children}</div>
+  );
+
   return (
-    <div className="container my-4">
-      <div className="card shadow">
-        <div className="card-header bg-primary text-white">
-          <h2 className="h4 mb-0">{id ? 'Edit Project' : 'Create New Project'}</h2>
-        </div>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; } to { opacity: 1; } }
+        .pf-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
+        @media (max-width: 860px) { .pf-layout { grid-template-columns: 1fr; } }
+      `}</style>
 
-        <div className="card-body">
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
+      <div style={{ minHeight: '100vh', background: '#1a1f2e', padding: '1.25rem 1.5rem', fontFamily: MONO }}>
+        <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="pf-layout">
 
-          <form onSubmit={handleSubmit}>
-            <div className="row g-3">
+              {/* ── LEFT: main card ── */}
+              <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
 
-              {/*  Basic Information  */}
-              <div className="col-12">
-                <h5 className="border-bottom pb-2 mb-3">Basic Information</h5>
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Order Date</label>
-                <input
-                  type="date"
-                  name="orderDate"
-                  value={formData.orderDate}
-                  onChange={handleChange}
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Submission Date</label>
-                <input
-                  type="date"
-                  name="submissionDate"
-                  value={formData.submissionDate}
-                  onChange={handleChange}
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">Order Reference Code</label>
-                <input
-                  type="text"
-                  name="orderRefCode"
-                  value={formData.orderRefCode}
-                  onChange={handleChange}
-                  className="form-control"
-                  required
-                  placeholder="Enter reference code"
-                />
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Order Type</label>
-                <select
-                  name="orderType"
-                  value={formData.orderType}
-                  onChange={handleChange}
-                  className="form-select"
-                  required
-                >
-                  <option value="normal">Normal</option>
-                  <option value="dissertation">Dissertation</option>
-                </select>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Priority</label>
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  className="form-select"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-
-              <div className="col-12">
-                <label className="form-label">Topic</label>
-                <input
-                  type="text"
-                  name="topic"
-                  value={formData.topic}
-                  onChange={handleChange}
-                  className="form-control"
-                  placeholder="Enter project topic"
-                />
-              </div>
-
-              {/*  Pricing Mode Toggle  */}
-              <div className="col-12 mt-4">
-                <h5 className="border-bottom pb-2 mb-3">Pricing Details</h5>
-
-                {/* Toggle pills */}
-                <div
-                  className="d-inline-flex rounded-3 p-1 mb-3"
-                  style={{ background: '#e9ecef', gap: '4px' }}
-                >
-                  <button
-                    type="button"
-                    className={`btn btn-sm px-4 ${
-                      pricingMode === 'word_count'
-                        ? 'btn-primary shadow-sm'
-                        : 'btn-link text-secondary text-decoration-none'
-                    }`}
-                    style={{ borderRadius: '6px', transition: 'all 0.2s' }}
-                    onClick={() => handlePricingModeChange('word_count')}
-                  >
-                    📄 Word Count
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm px-4 ${
-                      pricingMode === 'flat_rate'
-                        ? 'btn-primary shadow-sm'
-                        : 'btn-link text-secondary text-decoration-none'
-                    }`}
-                    style={{ borderRadius: '6px', transition: 'all 0.2s' }}
-                    onClick={() => handlePricingModeChange('flat_rate')}
-                  >
-                    💰 Flat Rate
-                  </button>
+                {/* Card header */}
+                <div style={{ background: '#0d6efd', padding: '0.85rem 1.25rem' }}>
+                  <h2 style={{ fontFamily: MONO, fontSize: '1.15rem', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
+                    {id ? 'Edit Project' : 'Create New Project'}
+                  </h2>
                 </div>
 
-                {/* Helper text */}
-                <p className="text-muted small mb-0">
-                  {pricingMode === 'word_count'
-                    ? 'Cost is calculated automatically from the word count and cost-per-page rate.'
-                    : 'Use this when the client gives a fixed agreed price with no word count specified.'}
-                </p>
-              </div>
+                {/* Card body */}
+                <div style={{ padding: '1.25rem' }}>
 
-              {/*  Word Count Mode  */}
-              {pricingMode === 'word_count' && (
-                <>
-                  <div className="col-md-6">
-                    <label className="form-label">Word Count</label>
-                    <input
-                      type="number"
-                      name="words"
-                      value={formData.words}
-                      onChange={handleChange}
-                      className="form-control"
-                      min="0"
-                      step="1"
-                      placeholder="e.g. 3000"
-                    />
+                  {/* Error */}
+                  {error && (
+                    <div style={{ fontFamily: MONO, fontSize: '0.8rem', background: '#f8d7da', border: '1px solid #f5c2c7', borderRadius: '4px', color: '#842029', padding: '0.6rem 0.85rem', marginBottom: '1rem', display: 'flex', gap: '0.45rem', animation: 'slideIn 0.2s ease' }}>
+                      <span>⚠</span><span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* ── Basic Information ── */}
+                  <SectionLabel>Basic Information</SectionLabel>
+                  <G3>
+                    <div>
+                      <FL>Order Date</FL>
+                      <FI type="date" name="orderDate" value={fd.orderDate} onChange={handleChange} required />
+                    </div>
+                    <div>
+                      <FL>Submission Date</FL>
+                      <FI type="date" name="submissionDate" value={fd.submissionDate} onChange={handleChange} required />
+                    </div>
+                    <div>
+                      <FL>Reference Code</FL>
+                      <FI type="text" name="orderRefCode" value={fd.orderRefCode} onChange={handleChange} placeholder="e.g. ORD-001" required />
+                    </div>
+                  </G3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
+                    <div>
+                      <FL>Order Type</FL>
+                      <FS name="orderType" value={fd.orderType} onChange={handleChange} required>
+                        <option value="normal">Normal</option>
+                        <option value="dissertation">Dissertation</option>
+                      </FS>
+                    </div>
+                    <div>
+                      <FL>Priority</FL>
+                      <FS name="priority" value={fd.priority} onChange={handleChange}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </FS>
+                    </div>
                   </div>
 
-                  <div className="col-md-6">
-                    <label className="form-label">Cost Per Page (CPP)</label>
-                    <select
-                      name="cpp"
-                      value={formData.cpp}
-                      onChange={handleChange}
-                      className="form-select"
-                      disabled={!(parseFloat(formData.words) > 0)}
-                    >
-                      <option value="">Select CPP</option>
-                      <option value="350">Ksh. 350</option>
-                      <option value="400">Ksh. 400</option>
-                    </select>
-                    {parseFloat(formData.words) > 0 && parseFloat(formData.cpp) > 0 && (
-                      <small className="text-muted">
-                        {formData.words} words / 275 x Ksh.{formData.cpp} = Ksh.
-                        {((parseFloat(formData.words) / 275) * parseFloat(formData.cpp)).toFixed(2)}
-                      </small>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <FL>Topic</FL>
+                    <FI type="text" name="topic" value={fd.topic} onChange={handleChange} placeholder="Enter project topic" />
+                  </div>
+
+                  <Divider />
+
+                  {/* ── Pricing ── */}
+                  <SectionLabel>Pricing Details</SectionLabel>
+
+                  {/* Mode toggle */}
+                  <div style={{ display: 'inline-flex', border: '1px solid #dee2e6', borderRadius: '6px', padding: '3px', gap: '2px', marginBottom: '0.85rem', background: '#f8f9fa' }}>
+                    {[['word_count', '📄 Word Count'], ['flat_rate', '💰 Flat Rate']].map(([mode, label]) => (
+                      <button key={mode} type="button" onClick={() => handleModeChange(mode)}
+                        style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: pricingMode === mode ? 700 : 500, padding: '0.35rem 1rem', borderRadius: '4px', border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: pricingMode === mode ? '#0d6efd' : 'transparent', color: pricingMode === mode ? '#fff' : '#6c757d' }}
+                      >{label}</button>
+                    ))}
+                  </div>
+
+                  <p style={{ fontFamily: MONO, fontSize: '0.7rem', color: '#6c757d', margin: '0 0 0.85rem', letterSpacing: '0.02em' }}>
+                    {pricingMode === 'word_count'
+                      ? 'Cost is calculated automatically from the word count and cost-per-page rate.'
+                      : 'Use this when the client gives a fixed agreed price with no word count specified.'}
+                  </p>
+
+                  {pricingMode === 'word_count' && (
+                    <G2>
+                      <div>
+                        <FL>Word Count</FL>
+                        <FI type="number" name="words" value={fd.words} onChange={handleChange} min="0" step="1" placeholder="e.g. 3000" />
+                      </div>
+                      <div>
+                        <FL>Cost Per Page (CPP)</FL>
+                        <FS name="cpp" value={fd.cpp} onChange={handleChange} disabled={!(parseFloat(fd.words) > 0)} style={{ opacity: parseFloat(fd.words) > 0 ? 1 : 0.55, background: parseFloat(fd.words) > 0 ? '#fff' : '#f8f9fa' }}>
+                          <option value="">Select CPP</option>
+                          <option value="350">Ksh. 350</option>
+                          <option value="400">Ksh. 400</option>
+                        </FS>
+                        {parseFloat(fd.words) > 0 && parseFloat(fd.cpp) > 0 && (
+                          <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: '#6c757d', margin: '0.25rem 0 0' }}>
+                            {fd.words} ÷ 275 × {fd.cpp} = Ksh.{((parseFloat(fd.words) / 275) * parseFloat(fd.cpp)).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </G2>
+                  )}
+
+                  {pricingMode === 'flat_rate' && (
+                    <div style={{ maxWidth: '260px' }}>
+                      <FL>Agreed Amount</FL>
+                      <div style={{ display: 'flex' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.65rem', background: '#e9ecef', border: '1px solid #ced4da', borderRight: 'none', borderRadius: '4px 0 0 4px', fontFamily: MONO, fontSize: '0.78rem', color: '#495057', flexShrink: 0 }}>Ksh.</span>
+                        <FI type="number" name="flatRate" value={fd.flatRate} onChange={handleChange} min="0" step="0.01" placeholder="0.00" style={{ borderRadius: '0 4px 4px 0' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add-ons */}
+                  <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.75rem' }}>
+                      <Toggle id="hasCode" checked={fd.hasCode} onChange={handleChange} label="Project includes code" />
+                      {fd.hasCode && (
+                        <div style={{ marginTop: '0.6rem', animation: 'slideIn 0.15s ease' }}>
+                          <FL>Code Amount (Ksh.)</FL>
+                          <FI type="number" name="codeAmount" value={fd.codeAmount} onChange={handleChange} min="0" step="0.01" placeholder="0.00" />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.75rem' }}>
+                      <Toggle id="hasPresentation" checked={fd.hasPresentation} onChange={handleChange} label="Includes presentation" />
+                      {fd.hasPresentation && (
+                        <div style={{ marginTop: '0.6rem', animation: 'slideIn 0.15s ease' }}>
+                          <FL>Slide Count</FL>
+                          <FI type="number" name="slideCount" value={fd.slideCount} onChange={handleChange} min="0" step="1" placeholder="0" />
+                          {(parseFloat(fd.slideCount) || 0) > 0 && (
+                            <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: '#6c757d', margin: '0.25rem 0 0' }}>
+                              Ksh.{calcPPT().toFixed(2)} (@ Ksh.400 / 3 slides)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Divider />
+
+                  {/* ── Payment & Status (side by side) ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div>
+                      <SectionLabel>Payment Information</SectionLabel>
+                      <div>
+                        <FL>Payment Status</FL>
+                        <FS name="paymentStatus" value={fd.paymentStatus} onChange={handleChange}>
+                          <option value="unpaid">Unpaid</option>
+                          <option value="partial">Partially Paid</option>
+                          <option value="paid">Fully Paid</option>
+                        </FS>
+                      </div>
+                      {fd.paymentStatus === 'partial' && (
+                        <div style={{ marginTop: '0.65rem', animation: 'slideIn 0.15s ease' }}>
+                          <FL>Amount Paid (Ksh.)</FL>
+                          <FI type="number" name="amountPaid" value={fd.amountPaid} onChange={handleChange} min="0" step="0.01" placeholder="0.00" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <SectionLabel>Project Status</SectionLabel>
+                      <div>
+                        <FL>Status</FL>
+                        <FS name="status" value={fd.status} onChange={handleChange}>
+                          <option value="pending">Pending</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </FS>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Divider />
+
+                  {/* ── Notes ── */}
+                  <SectionLabel>Notes</SectionLabel>
+                  <FTA name="notes" value={fd.notes} onChange={handleChange} rows={3} placeholder="Additional notes, instructions, or comments…" />
+
+                </div>
+              </div>
+
+              {/* ── RIGHT: sticky sidebar ── */}
+              <div style={{ position: 'sticky', top: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+
+                {/* Cost Summary card */}
+                <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+                  <div style={{ background: '#f8f9fa', borderBottom: '1px solid #dee2e6', padding: '0.6rem 1rem' }}>
+                    <span style={{ fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#495057' }}>Cost Breakdown</span>
+                  </div>
+                  <div style={{ padding: '0.85rem 1rem' }}>
+                    {hasBreakdown ? (
+                      <>
+                        {pricingMode === 'word_count' && (parseFloat(fd.words) || 0) > 0 && (
+                          <>
+                            <BRow label="Writing Cost" value={`Ksh.${writingCost.toFixed(2)}`} />
+                            <p style={{ fontFamily: MONO, fontSize: '0.65rem', color: '#adb5bd', margin: '0 0 0.3rem 0' }}>
+                              {fd.words} ÷ 275 × Ksh.{fd.cpp || 0}
+                            </p>
+                          </>
+                        )}
+                        {pricingMode === 'flat_rate' && (parseFloat(fd.flatRate) || 0) > 0 && (
+                          <BRow label="Flat Rate" value={`Ksh.${writingCost.toFixed(2)}`} />
+                        )}
+                        {fd.hasCode && (parseFloat(fd.codeAmount) || 0) > 0 && (
+                          <BRow label="Code" value={`Ksh.${parseFloat(fd.codeAmount || 0).toFixed(2)}`} />
+                        )}
+                        {fd.hasPresentation && (parseFloat(fd.slideCount) || 0) > 0 && (
+                          <>
+                            <BRow label="Presentation" value={`Ksh.${calcPPT().toFixed(2)}`} />
+                            <p style={{ fontFamily: MONO, fontSize: '0.65rem', color: '#adb5bd', margin: '0 0 0.3rem 0' }}>
+                              {fd.slideCount} slides
+                            </p>
+                          </>
+                        )}
+                        <div style={{ borderTop: '1px dashed #dee2e6', margin: '0.5rem 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: MONO, fontSize: '0.95rem', fontWeight: 800, color: '#212529' }}>
+                          <span>Total</span><span>Ksh.{calcAmount()}</span>
+                        </div>
+                        {fd.paymentStatus === 'partial' && (parseFloat(fd.amountPaid) || 0) > 0 && (
+                          <>
+                            <div style={{ borderTop: '1px dashed #dee2e6', margin: '0.5rem 0' }} />
+                            <BRow label="Paid" value={`Ksh.${parseFloat(fd.amountPaid).toFixed(2)}`} color="#198754" />
+                            <BRow label="Balance" value={`Ksh.${calcBalance()}`} color="#dc3545" bold />
+                          </>
+                        )}
+                        <div style={{ marginTop: '0.65rem' }}>
+                          {fd.paymentStatus === 'paid' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0f5132', background: '#d1e7dd', border: '1px solid #a3cfbb', borderRadius: '4px', padding: '0.25rem 0.6rem' }}>
+                              ✓ Fully Paid
+                            </span>
+                          )}
+                          {fd.paymentStatus === 'unpaid' && totalAmt > 0 && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#664d03', background: '#fff3cd', border: '1px solid #ffda6a', borderRadius: '4px', padding: '0.25rem 0.6rem' }}>
+                              Unpaid
+                            </span>
+                          )}
+                          {fd.paymentStatus === 'partial' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: MONO, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#084298', background: '#cfe2ff', border: '1px solid #9ec5fe', borderRadius: '4px', padding: '0.25rem 0.6rem' }}>
+                              Partial
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: '#adb5bd', margin: 0, textAlign: 'center', padding: '0.35rem 0', lineHeight: 1.6 }}>
+                        Fill in pricing details<br />to see a summary
+                      </p>
                     )}
                   </div>
-                </>
-              )}
+                </div>
 
-              {/*  Flat Rate Mode  */}
-              {pricingMode === 'flat_rate' && (
-                <div className="col-md-6">
-                  <label className="form-label">Agreed / Flat Rate Amount (Ksh.)</label>
-                  <div className="input-group">
-                    <span className="input-group-text">Ksh.</span>
-                    <input
-                      type="number"
-                      name="flatRate"
-                      value={formData.flatRate}
-                      onChange={handleChange}
-                      className="form-control"
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g. 5000"
-                    />
+                {/* Priority indicator */}
+                {fd.priority && (
+                  <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: priColor, flexShrink: 0 }} />
+                    <span style={{ fontFamily: MONO, fontSize: '0.72rem', color: '#495057' }}>
+                      <span style={{ fontWeight: 700, color: priColor }}>{fd.priority.charAt(0).toUpperCase() + fd.priority.slice(1)}</span> priority
+                    </span>
                   </div>
-                  <small className="text-muted">
-                    Enter the total price agreed with the client for this project.
-                  </small>
-                </div>
-              )}
+                )}
 
-              {/*  Code Add-on  */}
-              <div className="col-12 mt-3">
-                <div className="form-check mb-3">
-                  <input
-                    type="checkbox"
-                    name="hasCode"
-                    checked={formData.hasCode}
-                    onChange={handleChange}
-                    className="form-check-input"
-                    id="hasCode"
-                  />
-                  <label className="form-check-label" htmlFor="hasCode">
-                    Project Includes Code
-                  </label>
-                </div>
-              </div>
-
-              {formData.hasCode && (
-                <div className="col-md-6">
-                  <label className="form-label">Code Amount (Ksh.)</label>
-                  <input
-                    type="number"
-                    name="codeAmount"
-                    value={formData.codeAmount}
-                    onChange={handleChange}
-                    className="form-control"
-                    min="0"
-                    step="0.01"
-                    placeholder="Enter code amount"
-                  />
-                </div>
-              )}
-
-              {/*  Presentation Add-on  */}
-              <div className="col-12 mt-3">
-                <div className="form-check mb-3">
-                  <input
-                    type="checkbox"
-                    name="hasPresentation"
-                    checked={formData.hasPresentation}
-                    onChange={handleChange}
-                    className="form-check-input"
-                    id="hasPresentation"
-                  />
-                  <label className="form-check-label" htmlFor="hasPresentation">
-                    Project Includes PowerPoint Presentation
-                  </label>
-                </div>
-              </div>
-
-              {formData.hasPresentation && (
-                <div className="col-md-6">
-                  <label className="form-label">Number of Slides</label>
-                  <input
-                    type="number"
-                    name="slideCount"
-                    value={formData.slideCount}
-                    onChange={handleChange}
-                    className="form-control"
-                    min="0"
-                    step="1"
-                    placeholder="Enter number of slides"
-                  />
-                  {formData.slideCount > 0 && (
-                    <small className="text-muted">
-                      Cost: Ksh.{calculatePresentationCost().toFixed(2)} (@ Ksh.400 per 3 slides)
-                    </small>
-                  )}
-                </div>
-              )}
-
-              {/*  Payment Information  */}
-              <div className="col-12 mt-4">
-                <h5 className="border-bottom pb-2 mb-3">Payment Information</h5>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Payment Status</label>
-                <select
-                  name="paymentStatus"
-                  value={formData.paymentStatus}
-                  onChange={handleChange}
-                  className="form-select"
-                >
-                  <option value="unpaid">Unpaid</option>
-                  <option value="partial">Partially Paid</option>
-                  <option value="paid">Fully Paid</option>
-                </select>
-              </div>
-
-              {formData.paymentStatus === 'partial' && (
-                <div className="col-md-6">
-                  <label className="form-label">Amount Paid (Ksh.)</label>
-                  <input
-                    type="number"
-                    name="amountPaid"
-                    value={formData.amountPaid}
-                    onChange={handleChange}
-                    className="form-control"
-                    min="0"
-                    step="0.01"
-                    placeholder="Enter amount paid"
-                  />
-                </div>
-              )}
-
-              {/*  Project Status  */}
-              <div className="col-12 mt-4">
-                <h5 className="border-bottom pb-2 mb-3">Project Status</h5>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label">Status</label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="form-select"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              <div className="col-12">
-                <label className="form-label">Notes</label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  className="form-control"
-                  rows="3"
-                  placeholder="Enter any additional notes"
-                />
-              </div>
-
-              {/*  Cost Breakdown Summary  */}
-              <div className="col-12 mt-3">
-                <div className="alert alert-info">
-                  <h6 className="alert-heading">Cost Breakdown</h6>
-                  <hr />
-
-                  {/* Base cost row */}
-                  {pricingMode === 'word_count' && (parseFloat(formData.words) || 0) > 0 && (
-                    <div>
-                      <strong>Writing Cost:</strong> Ksh.{writingCost.toFixed(2)}
-                      <br />
-                      <small className="text-muted">
-                        ({formData.words} words / 275 x Ksh.{formData.cpp || 0} CPP)
-                      </small>
-                    </div>
-                  )}
-
-                  {pricingMode === 'flat_rate' && (parseFloat(formData.flatRate) || 0) > 0 && (
-                    <div>
-                      <strong>Flat Rate:</strong> Ksh.{writingCost.toFixed(2)}
-                      <br />
-                      <small className="text-muted">Agreed price, no word count</small>
-                    </div>
-                  )}
-
-                  {formData.hasCode && (parseFloat(formData.codeAmount) || 0) > 0 && (
-                    <div className="mt-2">
-                      <strong>Code Cost:</strong> Ksh.{parseFloat(formData.codeAmount || 0).toFixed(2)}
-                    </div>
-                  )}
-
-                  {formData.hasPresentation && (parseFloat(formData.slideCount) || 0) > 0 && (
-                    <div className="mt-2">
-                      <strong>Presentation Cost:</strong> Ksh.{calculatePresentationCost().toFixed(2)}
-                      <br />
-                      <small className="text-muted">
-                        ({formData.slideCount} slides @ Ksh.400 per 3 slides)
-                      </small>
-                    </div>
-                  )}
-
-                  <hr />
-                  <div className="mt-2">
-                    <strong className="fs-5">Total Amount: Ksh.{calculateAmount()}</strong>
-                  </div>
-
-                  {formData.paymentStatus === 'partial' && (parseFloat(formData.amountPaid) || 0) > 0 && (
-                    <div className="mt-2">
-                      <strong>Amount Paid:</strong> Ksh.{parseFloat(formData.amountPaid).toFixed(2)}
-                      <br />
-                      <strong className="text-danger">Balance Due:</strong> Ksh.{calculateBalance()}
-                    </div>
-                  )}
-
-                  {formData.paymentStatus === 'paid' && (
-                    <div className="mt-2">
-                      <span className="badge bg-success">Fully Paid</span>
-                    </div>
-                  )}
-
-                  {formData.paymentStatus === 'unpaid' && (
-                    <div className="mt-2">
-                      <span className="badge bg-warning text-dark">Unpaid</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/*  Actions  */}
-              <div className="col-12">
-                <div className="d-flex gap-2">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={isLoading}
+                {/* Action buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button type="submit" disabled={isLoading}
+                    style={{ fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.04em', background: isLoading ? '#6ea8fe' : '#0d6efd', border: 'none', borderRadius: '4px', color: '#fff', padding: '0.6rem 1rem', cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                    onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = '#0b5ed7'; }}
+                    onMouseLeave={e => { if (!isLoading) e.currentTarget.style.background = '#0d6efd'; }}
                   >
-                    {isLoading ? 'Saving...' : id ? 'Update Project' : 'Create Project'}
+                    {isLoading
+                      ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Saving…</>
+                      : (id ? '✓ Update Project' : '+ Create Project')
+                    }
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => navigate('/projects')}
-                  >
-                    Cancel
-                  </button>
+                  <button type="button" onClick={() => navigate('/projects')}
+                    style={{ fontFamily: MONO, fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.04em', background: '#6c757d', border: 'none', borderRadius: '4px', color: '#fff', padding: '0.55rem 1rem', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#5c636a'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#6c757d'; }}
+                  >Cancel</button>
                 </div>
-              </div>
 
+              </div>
             </div>
           </form>
         </div>
       </div>
-    </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </>
   );
 }
 

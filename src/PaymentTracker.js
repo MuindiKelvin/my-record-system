@@ -1599,7 +1599,7 @@ export default function PaymentTracker() {
     <div class="r-header">
       <div class="r-logo-row">
         <div class="r-icon-box">&#9775;</div>
-        <div><div class="r-brand">Payment Receipt</div><div class="r-subbrand">Freelance Order System</div></div>
+        <div><div class="r-brand">Payment Receipt</div><div class="r-subbrand">Kelvin Muindi &mdash; Freelance Order System</div></div>
       </div>
     </div>
     <div class="r-meta-grid">
@@ -1619,7 +1619,7 @@ export default function PaymentTracker() {
     <div class="stamp-area"><div class="stamp">${stampMark}&nbsp; ${stampText}</div></div>
     <div class="barcode-row">${barsHtml}</div>
     <div class="ref-code">${(p.orderRefCode || p.id || '').toUpperCase()}</div>
-    <div class="r-footer">Printed: ${printDateStr}<br>${p.lastUpdated ? `Last updated: ${new Date(p.lastUpdated).toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}<br>This is a system-generated receipt. Retain for your records.</div>
+    <div class="r-footer">Issued to: <strong>Kelvin Muindi</strong><br>Printed: ${printDateStr}<br>${p.lastUpdated ? `Last updated: ${new Date(p.lastUpdated).toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}<br>This is a system-generated receipt. Retain for your records.</div>
   </div>
   <div class="tear tear-bottom"></div>
 </div>
@@ -1723,7 +1723,7 @@ export default function PaymentTracker() {
             </td>
             <td style="padding:0.42rem 0.75rem;font-size:0.66rem;font-weight:600;white-space:nowrap;text-align:right;
               color:${bal > 0 ? '#991b1b' : '#1a6b3c'};">
-              ${bal > 0 ? fmtR(bal) : '<span style="color:#1a6b3c">✓ Settled</span>'}
+              ${bal > 0 ? fmtR(bal) : '<span style="color:#1a6b3c">PAID</span>'}
             </td>
           </tr>`;
       });
@@ -1812,7 +1812,7 @@ export default function PaymentTracker() {
     <div class="r-header">
       <div class="r-logo-row">
         <div class="r-icon-box">&#9775;</div>
-        <div><div class="r-brand">Monthly Statement</div><div class="r-subbrand">Freelance Order System</div></div>
+        <div><div class="r-brand">Monthly Statement</div><div class="r-subbrand">Kelvin Muindi &mdash; Freelance Order System</div></div>
       </div>
       <div class="r-month-badge">${monthLabel}</div>
     </div>
@@ -1865,7 +1865,7 @@ export default function PaymentTracker() {
     </div>
     <div class="barcode-row">${barsHtml}</div>
     <div class="ref-code">STMT &middot; ${monthKey.replace('-', '/')} &middot; ${monthOrders.length} ORDERS</div>
-    <div class="r-footer">Generated: ${printDateStr}<br>This is a system-generated monthly statement. Retain for your records.</div>
+    <div class="r-footer">Issued to: <strong>Kelvin Muindi</strong><br>Generated: ${printDateStr}<br>This is a system-generated monthly statement. Retain for your records.</div>
   </div>
   <div class="tear tear-bottom"></div>
 </div>
@@ -2588,7 +2588,7 @@ export default function PaymentTracker() {
                           <ReceiptLogoIcon><FaCalendarAlt /></ReceiptLogoIcon>
                           <div>
                             <ReceiptBrandName>Monthly Statement</ReceiptBrandName>
-                            <ReceiptSubBrand>Freelance Order System</ReceiptSubBrand>
+                            <ReceiptSubBrand>Kelvin Muindi — Freelance Order System</ReceiptSubBrand>
                           </div>
                         </ReceiptLogoRow>
                         <div style={{
@@ -2678,7 +2678,7 @@ export default function PaymentTracker() {
                                   {fmt(p.amount)}
                                 </td>
                                 <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.62rem', color: statusC, whiteSpace: 'nowrap' }}>
-                                  {effS === 'paid' ? '✓ Settled' : fmt(bal)}
+                                  {effS === 'paid' ? 'PAID' : fmt(bal)}
                                 </td>
                               </tr>
                             );
@@ -2710,6 +2710,7 @@ export default function PaymentTracker() {
                       <ReceiptRefCode>STMT · {filterMonth.replace('-', '/')} · {monthOrders.length} ORDERS</ReceiptRefCode>
 
                       <ReceiptFooter>
+                        Issued to: <strong style={{ color: '#1a1a1a' }}>Kelvin Muindi</strong><br />
                         Generated: {new Date().toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}<br />
                         System-generated monthly statement — retain for your records.
                       </ReceiptFooter>
@@ -2790,7 +2791,7 @@ export default function PaymentTracker() {
                           <ReceiptLogoIcon><FaMoneyBillWave /></ReceiptLogoIcon>
                           <div>
                             <ReceiptBrandName>Payment Receipt</ReceiptBrandName>
-                            <ReceiptSubBrand>Freelance Order System</ReceiptSubBrand>
+                            <ReceiptSubBrand>Kelvin Muindi — Freelance Order System</ReceiptSubBrand>
                           </div>
                         </ReceiptLogoRow>
                       </ReceiptHeaderSec>
@@ -2885,6 +2886,7 @@ export default function PaymentTracker() {
                       <ReceiptRefCode>{(p.orderRefCode || p.id || '').toUpperCase()}</ReceiptRefCode>
 
                       <ReceiptFooter>
+                        Issued to: <strong style={{ color: '#1a1a1a' }}>Kelvin Muindi</strong><br />
                         {p.lastUpdated && (
                           <>Last updated: {new Date(p.lastUpdated).toLocaleString('en-KE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}<br /></>
                         )}
