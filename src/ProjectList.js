@@ -12,15 +12,15 @@ import {
   FaPencilAlt, FaTrashAlt
 } from 'react-icons/fa';
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // Font style: IBM Plex Mono / Fira Code / monospace
-// ─────────────────────────────────────────────────────────────────────────────
+
 const MONO_FONT = "'IBM Plex Mono', 'Fira Code', monospace";
 const monoStyle = { fontFamily: MONO_FONT };
 
-// ─────────────────────────────────────────────────────────────────────────────
+//
 // ActionButton — icon pill with slide-in label on hover
-// ─────────────────────────────────────────────────────────────────────────────
+// ─
 function ActionButton({ icon: Icon, label, onClick, variant }) {
   const [hovered, setHovered] = useState(false);
 
@@ -102,9 +102,9 @@ function ActionButton({ icon: Icon, label, onClick, variant }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─
 // Dissertation Invoice Generator — with Code Amount support
-// ─────────────────────────────────────────────────────────────────────────────
+// ─
 function generateDissertationInvoice(dissertationProjects, targetMonthLabel, format = 'xlsx') {
 
   const clientMap = new Map();
@@ -445,9 +445,8 @@ function generateDissertationInvoice(dissertationProjects, targetMonthLabel, for
   XLSX.writeFile(wb, `Kevz_Dissertations_Invoice_${monthYearLabel}.xlsx`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
-// ─────────────────────────────────────────────────────────────────────────────
+// ─
 function ProjectList() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -870,7 +869,7 @@ function ProjectList() {
 
   return (
     <>
-      {/* ── Styles ── */}
+      {/*  Styles  */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap');
 
@@ -962,7 +961,7 @@ function ProjectList() {
       `}</style>
 
       <div className="container-fluid py-4 pl-mono">
-        {/* ── Toast ── */}
+        {/*  Toast  */}
         <div className="position-fixed top-0 end-0 p-3" style={{ zIndex: 1050 }}>
           <motion.div
             ref={toastRef}
@@ -997,7 +996,7 @@ function ProjectList() {
           </div>
 
           <div className="card-body">
-            {/* ── Filters Row ── */}
+            {/*  Filters Row  */}
             <div
               className="mb-3"
               style={{
@@ -1148,7 +1147,7 @@ function ProjectList() {
               </button>
             </div>
 
-            {/* ── Column Selector ── */}
+            {/*  Column Selector  */}
             {showColumnSelector && (
               <motion.div
                 className="card mb-3"
@@ -1197,7 +1196,7 @@ function ProjectList() {
               </motion.div>
             )}
 
-            {/* ── Dissertation Invoice Info Banner ── */}
+            {/*  Dissertation Invoice Info Banner  */}
             {selectedCategory === 'dissertation' && (
               <motion.div
                 className="alert alert-info d-flex align-items-center gap-2 py-2 mb-3"
@@ -1224,7 +1223,7 @@ function ProjectList() {
               </motion.div>
             )}
 
-            {/* ── Table ── */}
+            {/*  Table  */}
             <div className="table-responsive">
               <table className="table table-striped table-hover">
                 <thead>
@@ -1324,7 +1323,7 @@ function ProjectList() {
                           : '-'}
                       </td>
 
-                      {/* ── Action Buttons ── */}
+                      {/*  Action Buttons  */}
                       <td>
                         <div className="actions-cell">
                           <ActionButton
@@ -1347,7 +1346,7 @@ function ProjectList() {
               </table>
             </div>
 
-            {/* ── Pagination ── */}
+            {/*  Pagination  */}
             <div className="d-flex justify-content-between align-items-center mt-3">
               <div>
                 Showing {startIndex + 1} to{' '}

@@ -14,7 +14,7 @@ import {
   FaPrint, FaFileInvoiceDollar, FaCalendarAlt,
 } from 'react-icons/fa';
 
-// ─── Themes ────────────────────────────────────────────────────────────────────
+// Themes 
 const themes = {
   dark: {
     name: 'dark',
@@ -83,7 +83,7 @@ const themes = {
 
 const THEME_ORDER = ['dark', 'light', 'vibrant'];
 
-// ─── Animations ───────────────────────────────────────────────────────────────
+// Animations
 const fadeUp = keyframes`
   from { transform:translateY(8px); opacity:0 }
   to   { transform:translateY(0);   opacity:1 }
@@ -106,7 +106,7 @@ const stampDrop = keyframes`
   100% { transform: rotate(-3deg) scale(1); opacity: 1; }
 `;
 
-// ─── Global style ─────────────────────────────────────────────────────────────
+// Global style 
 const GlobalStyle = createGlobalStyle`
   body {
     background: ${p => p.theme.bg};
@@ -114,7 +114,7 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
-// ─── Styled Components ────────────────────────────────────────────────────────
+// Styled Components 
 const Page = styled.div`
   min-height: 100vh;
   background: ${p => p.theme.bg};
@@ -747,7 +747,7 @@ const BulkProgress = styled.div`
   flex-shrink: 0;
 `;
 
-// ─── Receipt Preview Styled Components ────────────────────────────────────────
+// Receipt Preview Styled Components
 
 const ReceiptOverlay = styled(motion.div)`
   position: fixed;
@@ -770,7 +770,7 @@ const ReceiptWrapper = styled(motion.div)`
   margin: auto;
 `;
 
-// ─── Monthly Receipt Preview (wider) ──────────────────────────────────────────
+// Monthly Receipt Preview (wider) 
 const MonthReceiptWrapper = styled(motion.div)`
   width: 100%;
   max-width: 600px;
@@ -1024,7 +1024,7 @@ const ReceiptPreviewLabel = styled.div`
   margin-bottom: 0.5rem;
 `;
 
-// ─── Monthly Statement Preview Styled Components ───────────────────────────────
+// Monthly Statement Preview Styled Components 
 
 const MonthSummaryGrid = styled.div`
   display: grid;
@@ -1109,7 +1109,7 @@ const MonthOrderTable = styled.table`
   }
 `;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Helpers 
 const fmt = n => `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
 
 const statusIcon = (s, theme) =>
@@ -1122,14 +1122,14 @@ const isFullyPaid = (p) =>
   Number(p.amountPaid || 0) >= Number(p.amount || 0) &&
   Number(p.amount || 0) > 0;
 
-// ── Derive the effective balance for a record, never trusting the stored field alone ──
+//  Derive the effective balance for a record, never trusting the stored field alone 
 const effectiveBalance = (p) => {
   const amount    = Number(p.amount)    || 0;
   const amountPaid = Number(p.amountPaid) || 0;
   return Math.max(0, amount - amountPaid);
 };
 
-// ── Derive the effective payment status from the actual numbers ──
+//  Derive the effective payment status from the actual numbers 
 const effectiveStatus = (p) => {
   const amount     = Number(p.amount)    || 0;
   const amountPaid = Number(p.amountPaid) || 0;
@@ -1149,7 +1149,7 @@ const nextThemeIcon = (current) => {
                               <FaPalette />;
 };
 
-// ── Barcode generator from seed string ──
+//  Barcode generator from seed string 
 function genBars(seed = 'receipt') {
   const bars = [];
   const s = seed || 'receipt';
@@ -1163,7 +1163,7 @@ function genBars(seed = 'receipt') {
   return bars;
 }
 
-// ── Sparkline SVG ──
+//  Sparkline SVG 
 function Sparkline({ data, color, height = 28 }) {
   if (!data || data.length < 2) return null;
   const w = 120, h = height;
@@ -1206,7 +1206,7 @@ function Sparkline({ data, color, height = 28 }) {
   );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// Component 
 export default function PaymentTracker() {
   const [activeThemeName, setActiveThemeName] = useState(() => {
     return localStorage.getItem('paymentTrackerTheme') || 'dark';
@@ -1220,7 +1220,7 @@ export default function PaymentTracker() {
     localStorage.setItem('paymentTrackerTheme', next);
   };
 
-  // ── Live clock ──
+  //  Live clock 
   const [clock, setClock] = useState('');
   useEffect(() => {
     const tick = () => {
@@ -1249,12 +1249,12 @@ export default function PaymentTracker() {
   const [cfCandidates,      setCfCandidates]      = useState([]);
   const [cfRunning,         setCfRunning]         = useState(false);
   const [receiptProject,    setReceiptProject]    = useState(null);
-  // ── NEW: monthly statement preview ──
+  //  NEW: monthly statement preview 
   const [monthReceiptOpen,  setMonthReceiptOpen]  = useState(false);
 
   const searchRef = useRef(null);
 
-  // ── Keyboard shortcuts ──
+  //  Keyboard shortcuts 
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -1281,7 +1281,7 @@ export default function PaymentTracker() {
     return () => window.removeEventListener('keydown', handler);
   }, [editState, activeThemeName, receiptProject, monthReceiptOpen]);
 
-  // ── Fetch ──
+  //  Fetch 
   const fetchProjects = async () => {
     setLoading(true);
     try {
@@ -1297,13 +1297,13 @@ export default function PaymentTracker() {
 
   useEffect(() => { fetchProjects(); }, []);
 
-  // ── Toast ──
+  //  Toast 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Edit state helpers ──
+  //  Edit state helpers 
   const getEdit = (p) => editState[p.id] ?? {
     status:     effectiveStatus(p),
     amountPaid: Number(p.amountPaid) || 0,
@@ -1323,7 +1323,7 @@ export default function PaymentTracker() {
   const markPartial = (p) => { if (getEdit(p).status !== 'partial') setEdit(p.id, { status: 'partial', amountPaid: getEdit(p).amountPaid || 0 }); };
   const markUnpaid  = (p) => setEdit(p.id, { status: 'unpaid',  amountPaid: 0 });
 
-  // ── Save single row ──
+  //  Save single row 
   const saveRow = async (p) => {
     const ed = getEdit(p);
     const totalAmount = Number(p.amount) || 0;
@@ -1356,7 +1356,7 @@ export default function PaymentTracker() {
     }
   };
 
-  // ── Save all dirty rows ──
+  //  Save all dirty rows 
   const saveAll = async () => {
     const dirtyIds = Object.keys(editState);
     if (!dirtyIds.length) return;
@@ -1367,7 +1367,7 @@ export default function PaymentTracker() {
     showToast(`All ${dirtyIds.length} changes saved.`, 'success');
   };
 
-  // ── Bulk apply status ──
+  //  Bulk apply status 
   const [bulkRunning,  setBulkRunning]  = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
 
@@ -1433,7 +1433,7 @@ export default function PaymentTracker() {
     );
   };
 
-  // ── Carry-forward ──
+  //  Carry-forward 
   const openCarryForward = () => {
     const now = new Date();
     const [cy, cm] = [now.getFullYear(), now.getMonth()];
@@ -1491,7 +1491,7 @@ export default function PaymentTracker() {
     }
   };
 
-  // ── Receipt printing (single order) ──
+  //  Receipt printing (single order) 
   const printReceiptToWindow = (p) => {
     const statusS    = effectiveStatus(p);
     const totalAmt   = Number(p.amount) || 0;
@@ -1635,9 +1635,9 @@ export default function PaymentTracker() {
     win.document.close();
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // ── MONTHLY RECEIPT / STATEMENT ───────────────────────────────────────────
-  // ─────────────────────────────────────────────────────────────────────────────
+
+  // MONTHLY RECEIPT / STATEMENT PREVIEW
+ 
   const printMonthlyReceipt = (monthKey) => {
     const [yr, mo] = monthKey.split('-');
     const monthLabel = new Date(Number(yr), Number(mo) - 1, 1)
@@ -1881,7 +1881,7 @@ export default function PaymentTracker() {
     win.document.close();
   };
 
-  // ── Month options ──
+  //  Month options 
   const monthOptions = useMemo(() => {
     const seen = new Set();
     projects.forEach(p => {
@@ -1897,7 +1897,7 @@ export default function PaymentTracker() {
     });
   }, [projects]);
 
-  // ── Monthly stats for in-app preview ──
+  //  Monthly stats for in-app preview 
   const monthStats = useMemo(() => {
     if (filterMonth === 'all') return null;
     const monthOrders = projects.filter(p => {
@@ -1918,7 +1918,7 @@ export default function PaymentTracker() {
     return { monthOrders, totalInvoiced, totalReceived, totalOutstanding, cPaid, cPartial, cUnpaid, collectionRate, monthLabel };
   }, [projects, filterMonth]);
 
-  // ── Sorting ──
+  //  Sorting 
   const handleSort = (key) => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
     setCurrentPage(1);
@@ -1929,7 +1929,7 @@ export default function PaymentTracker() {
     return sortConfig.direction === 'asc' ? <FaSortUp /> : <FaSortDown />;
   };
 
-  // ── Filtered + Sorted + Partitioned ──
+  //  Filtered + Sorted + Partitioned 
   const processed = useMemo(() => {
     let list = [...projects];
 
@@ -1965,7 +1965,7 @@ export default function PaymentTracker() {
     return { active, paid, all: [...active, ...paid] };
   }, [projects, search, filterStatus, filterMonth, sortConfig]);
 
-  // ── Pagination ──
+  //  Pagination 
   const totalItems = processed.all.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const safePage   = Math.min(currentPage, totalPages);
@@ -1977,9 +1977,9 @@ export default function PaymentTracker() {
 
   const paidGlobalStart = processed.active.length;
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // ── STATS ─────────────────────────────────────────────────────────────────
-  // ─────────────────────────────────────────────────────────────────────────────
+  
+  //  STATS 
+
   const stats = useMemo(() => {
     const all = projects;
     const totalInvoiced   = all.reduce((s, p) => s + (Number(p.amount)    || 0), 0);
@@ -1991,7 +1991,7 @@ export default function PaymentTracker() {
     return { total: totalInvoiced, paid: totalReceived, balance: totalOutstanding, cPaid, cPartial, cUnpaid };
   }, [projects]);
 
-  // ── Sparkline data ──
+  //  Sparkline data 
   const sparkData = useMemo(() => {
     const months = {};
     projects.forEach(p => {
@@ -2027,7 +2027,7 @@ export default function PaymentTracker() {
     return pages;
   }, [totalPages, safePage]);
 
-  // ── Receipt in-app preview helpers ──
+  //  Receipt in-app preview helpers 
   const getStampProps = (status) => {
     switch ((status || 'unpaid').toLowerCase()) {
       case 'paid':    return { c: '#1a6b3c', bg: '#d1fae5', text: 'PAID IN FULL', mark: '✓' };
@@ -2036,17 +2036,17 @@ export default function PaymentTracker() {
     }
   };
 
-  // ── Rate bar color ──
+  //  Rate bar color 
   const rateColor = (rate) =>
     rate >= 80 ? '#1a6b3c' : rate >= 50 ? '#b45309' : '#991b1b';
 
-  // ── Render ──
+  //  Render 
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle theme={theme} />
       <Page>
         <Inner>
-          {/* ── Header ── */}
+          {/*  Header  */}
           <Header>
             <HeaderLeft>
               <Title>
@@ -2071,7 +2071,7 @@ export default function PaymentTracker() {
             </HeaderRight>
           </Header>
 
-          {/* ── Stats Bar ── */}
+          {/*  Stats Bar  */}
           <StatsBar>
             {[
               {
@@ -2114,7 +2114,7 @@ export default function PaymentTracker() {
             ))}
           </StatsBar>
 
-          {/* ── Bulk Action Panel ── */}
+          {/*  Bulk Action Panel  */}
           <AnimatePresence>
             {filterMonth !== 'all' && (
               <BulkPanel
@@ -2156,7 +2156,7 @@ export default function PaymentTracker() {
                   <FaTimesCircle /> Mark All Unpaid
                 </BulkBtn>
 
-                {/* ── NEW: Monthly Statement button in Bulk Panel ── */}
+                {/*  NEW: Monthly Statement button in Bulk Panel  */}
                 <BulkDivider theme={theme} />
                 <BulkBtn
                   $bg={`${theme.primary}18`} $color={theme.primary} $border={`${theme.primary}33`}
@@ -2175,7 +2175,7 @@ export default function PaymentTracker() {
             )}
           </AnimatePresence>
 
-          {/* ── Controls ── */}
+          {/*  Controls  */}
           <Controls>
             <SearchBox theme={theme}>
               <FaSearch />
@@ -2234,7 +2234,7 @@ export default function PaymentTracker() {
               <FaForward /> Carry Forward
             </ActionBtn>
 
-            {/* ── NEW: Monthly Statement button in Controls (visible when month is selected) ── */}
+            {/*  NEW: Monthly Statement button in Controls (visible when month is selected)  */}
             {filterMonth !== 'all' && (
               <ActionBtn
                 $color={theme.primary}
@@ -2258,7 +2258,7 @@ export default function PaymentTracker() {
             </ActionBtn>
           </Controls>
 
-          {/* ── Table ── */}
+          {/*  Table  */}
           <TableWrap theme={theme}>
             {loading ? (
               <EmptyState theme={theme}>
@@ -2454,7 +2454,7 @@ export default function PaymentTracker() {
                   </tbody>
                 </Table>
 
-                {/* ── Pagination ── */}
+                {/*  Pagination  */}
                 <Pagination theme={theme}>
                   <PageInfo theme={theme}>
                     Showing {Math.min((safePage - 1) * itemsPerPage + 1, totalItems)}–
@@ -2494,7 +2494,7 @@ export default function PaymentTracker() {
           </TableWrap>
         </Inner>
 
-        {/* ── Carry-forward Modal ── */}
+        {/*  Carry-forward Modal  */}
         <AnimatePresence>
           {cfModal && (
             <Overlay
@@ -2548,7 +2548,7 @@ export default function PaymentTracker() {
           )}
         </AnimatePresence>
 
-        {/* ── Monthly Statement Preview Modal (NEW) ── */}
+        {/*  Monthly Statement Preview Modal (NEW)  */}
         <AnimatePresence>
           {monthReceiptOpen && monthStats && (() => {
             const { monthOrders, totalInvoiced, totalReceived, totalOutstanding,
@@ -2742,7 +2742,7 @@ export default function PaymentTracker() {
           })()}
         </AnimatePresence>
 
-        {/* ── Receipt Preview Modal (single order) ── */}
+        {/*  Receipt Preview Modal (single order)  */}
         <AnimatePresence>
           {receiptProject && (() => {
             const p        = receiptProject;
@@ -2921,7 +2921,7 @@ export default function PaymentTracker() {
           })()}
         </AnimatePresence>
 
-        {/* ── Toast ── */}
+        {/*  Toast  */}
         <AnimatePresence>
           {toast && (
             <Toast

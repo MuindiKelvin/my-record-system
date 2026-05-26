@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 
 const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
 
-// ── Primitives ────────────────────────────────────────────────────────────────
+//  Primitives 
 
 function SectionLabel({ children }) {
   return (
@@ -60,7 +60,7 @@ function FS({ style, children, ...p }) {
   );
 }
 
-// ── Alert type logic ───────────────────────────────────────────────────────────
+// Alert type logic 
 
 const computeAlertType = (project, currentDate) => {
   const submissionDate = new Date(project.submissionDate);
@@ -86,7 +86,7 @@ const computeAlertType = (project, currentDate) => {
   return null;
 };
 
-// ── Type config ────────────────────────────────────────────────────────────────
+// Type config 
 
 const TYPE_CONFIG = {
   'overdue':          { color: '#dc3545', bg: '#f8d7da', border: '#f5c2c7', icon: FaExclamationTriangle, label: 'Overdue'          },
@@ -98,7 +98,7 @@ const TYPE_CONFIG = {
 
 const getTypeConfig = (type) => TYPE_CONFIG[type] || TYPE_CONFIG['due-soon'];
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// Sub-components
 
 function TypeBadge({ type }) {
   const cfg = getTypeConfig(type);
@@ -194,7 +194,7 @@ function IconBtn({ onClick, title, variant = 'secondary', children }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// Main component
 
 function NotificationPage() {
   const navigate = useNavigate();
@@ -208,7 +208,7 @@ function NotificationPage() {
   const [itemsPerPage, setItemsPerPage]                 = useState(10);
   const pageSizeOptions = [5, 10, 20, 50];
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  // Fetch 
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -308,7 +308,7 @@ function NotificationPage() {
     }
   };
 
-  // ── Filters & pagination ───────────────────────────────────────────────────
+  // Filters & pagination 
 
   const filteredNotifications = notifications.filter(notif => {
     const typeMatch = filterType === 'all' || notif.type === filterType;
@@ -331,7 +331,7 @@ function NotificationPage() {
     setCurrentPage(1);
   };
 
-  // ── Selection ──────────────────────────────────────────────────────────────
+  // Selection 
 
   const toggleSelection = (id) => {
     setSelectedNotifications(prev =>
@@ -349,7 +349,7 @@ function NotificationPage() {
     }
   };
 
-  // ── Bulk actions ───────────────────────────────────────────────────────────
+  //  Bulk actions 
 
   const bulkToggleRead = async (markAsRead) => {
     try {
@@ -394,7 +394,7 @@ function NotificationPage() {
     }
   };
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // Lifecycle 
 
   useEffect(() => {
     fetchNotifications();
@@ -404,7 +404,7 @@ function NotificationPage() {
 
   useEffect(() => { setCurrentPage(1); }, [filterType, filterRead]);
 
-  // ── Derived counts ─────────────────────────────────────────────────────────
+  // Derived counts 
 
   const unreadCount   = notifications.filter(n => !n.isRead).length;
   const selectedCount = selectedNotifications.length;
@@ -417,7 +417,7 @@ function NotificationPage() {
     'in-progress-long':notifications.filter(n => n.type === 'in-progress-long').length,
   };
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  // Loading state 
 
   if (isLoading) {
     return (
@@ -437,7 +437,7 @@ function NotificationPage() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // Render
 
   return (
     <>
@@ -454,7 +454,7 @@ function NotificationPage() {
       <div style={{ minHeight: '100vh', background: '#1a1f2e', padding: '1.25rem 1.5rem', fontFamily: MONO }}>
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
 
-          {/* ── Main Card ── */}
+          {/*  Main Card  */}
           <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
 
             {/* Card Header */}
@@ -523,7 +523,7 @@ function NotificationPage() {
                 </div>
               )}
 
-              {/* ── Filters ── */}
+              {/* Filters  */}
               <SectionLabel><FaFilter style={{ marginRight: '0.4rem' }} />Filters</SectionLabel>
               <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.85rem 1rem', marginBottom: '1rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'start' }}>
@@ -574,7 +574,7 @@ function NotificationPage() {
                 </div>
               </div>
 
-              {/* ── Bulk Actions Bar ── */}
+              {/*  Bulk Actions Bar  */}
               {selectedCount > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
@@ -597,7 +597,7 @@ function NotificationPage() {
                 </motion.div>
               )}
 
-              {/* ── Empty State ── */}
+              {/*  Empty State  */}
               {filteredNotifications.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
                   <FaBell size={48} style={{ color: '#dee2e6', marginBottom: '0.85rem' }} />
@@ -612,7 +612,7 @@ function NotificationPage() {
                 </div>
               ) : (
                 <>
-                  {/* ── Table ── */}
+                  {/*  Table  */}
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: MONO, fontSize: '0.8rem' }}>
                       <thead>
@@ -772,7 +772,7 @@ function NotificationPage() {
 
                   <Divider />
 
-                  {/* ── Pagination ── */}
+                  {/*  Pagination  */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <p style={{ fontFamily: MONO, fontSize: '0.72rem', color: '#6c757d', margin: 0 }}>
                       Showing{' '}

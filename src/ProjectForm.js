@@ -5,8 +5,6 @@ import { db } from './firebase';
 
 const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
 
-// ── Primitives ────────────────────────────────────────────────────────────────
-
 function FL({ children }) {
   return (
     <label style={{
@@ -71,12 +69,19 @@ function Divider() {
   return <div style={{ height: '1px', background: '#dee2e6', margin: '0.85rem 0' }} />;
 }
 
-function Toggle({ checked, onChange, id, label }) {
+
+function Toggle({ checked, onChange, id, name, label }) {
   return (
     <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
       <div style={{ position: 'relative', width: '36px', height: '20px', flexShrink: 0 }}>
-        <input type="checkbox" id={id} checked={checked} onChange={onChange}
-          style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+        <input
+          type="checkbox"
+          id={id}
+          name={name}          // ← was missing; handleChange needs this
+          checked={checked}
+          onChange={onChange}
+          style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+        />
         <div style={{
           position: 'absolute', inset: 0, borderRadius: '10px',
           background: checked ? '#0d6efd' : '#dee2e6',
@@ -101,7 +106,32 @@ function BRow({ label, value, color, bold }) {
   );
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+function G2({ children, style }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function G3({ children }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+      {children}
+    </div>
+  );
+}
+
+
+// Helpers 
+
+// ✅ FIX: Safe numeric parser — returns 0 for empty/invalid, handles string input from text fields
+const toNum = (v) => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; };
+
+// ✅ FIX: Validates that a string contains only digits (for integer fields like word count / slide count)
+const isPositiveInt = (v) => /^\d+$/.test(String(v).trim()) && parseInt(v, 10) > 0;
+
+//  Main 
 
 function ProjectForm() {
   const navigate = useNavigate();
@@ -136,13 +166,13 @@ function ProjectForm() {
             orderDate: d.orderDate || init.orderDate,
             submissionDate: d.submissionDate || init.submissionDate,
             orderType: d.orderType || 'normal',
-            words: d.words != null ? Math.round(d.words).toString() : '',
+            words: d.words != null && d.words > 0 ? String(Math.round(d.words)) : '',
             cpp: d.cpp?.toString() || '',
             flatRate: d.flatRate?.toString() || '',
             codeAmount: d.codeAmount?.toString() || '',
             hasCode: Boolean(d.hasCode),
             hasPresentation: Boolean(d.hasPresentation),
-            slideCount: d.slideCount != null ? Math.round(d.slideCount).toString() : '',
+            slideCount: d.slideCount != null && d.slideCount > 0 ? String(Math.round(d.slideCount)) : '',
             paymentStatus: d.paymentStatus || 'unpaid',
             amountPaid: d.amountPaid?.toString() || '',
             status: d.status || 'pending',
@@ -173,42 +203,42 @@ function ProjectForm() {
     setError('');
   };
 
-  const calcPPT = () => (parseFloat(fd.slideCount) || 0) * (400 / 3);
+  const calcPPT = () => toNum(fd.slideCount) * (400 / 3);
 
   const calcAmount = () => {
-    let base = pricingMode === 'word_count'
-      ? ((parseFloat(fd.words) || 0) / 275) * (parseFloat(fd.cpp) || 0)
-      : (parseFloat(fd.flatRate) || 0);
-    const code = fd.hasCode ? parseFloat(fd.codeAmount) || 0 : 0;
+    const base = pricingMode === 'word_count'
+      ? (toNum(fd.words) / 275) * toNum(fd.cpp)
+      : toNum(fd.flatRate);
+    const code = fd.hasCode ? toNum(fd.codeAmount) : 0;
     const ppt  = fd.hasPresentation ? calcPPT() : 0;
     const t = base + code + ppt;
     return isNaN(t) ? '0.00' : t.toFixed(2);
   };
 
-  const calcBalance = () => (parseFloat(calcAmount()) - (parseFloat(fd.amountPaid) || 0)).toFixed(2);
+  const calcBalance = () => (parseFloat(calcAmount()) - toNum(fd.amountPaid)).toFixed(2);
 
   const validate = () => {
     const errs = [];
     if (!fd.orderDate) errs.push('Order date required');
     if (!fd.submissionDate) errs.push('Submission date required');
-    if (!fd.orderRefCode) errs.push('Reference code required');
+    if (!fd.orderRefCode.trim()) errs.push('Reference code required');
     if (!fd.orderType) errs.push('Order type required');
     if (pricingMode === 'word_count') {
-      const hw = fd.words && parseFloat(fd.words) > 0;
-      const hc = fd.hasCode && fd.codeAmount;
-      const hp = fd.hasPresentation && fd.slideCount;
+      const hw = fd.words.trim() !== '' && toNum(fd.words) > 0;
+      const hc = fd.hasCode && fd.codeAmount.trim() !== '';
+      const hp = fd.hasPresentation && fd.slideCount.trim() !== '';
       if (!hw && !hc && !hp) errs.push('Provide word count, code amount, or slide count');
-      if (hw && (!fd.cpp || parseFloat(fd.cpp) <= 0)) errs.push('CPP required when word count is set');
+      if (hw && toNum(fd.cpp) <= 0) errs.push('CPP required when word count is set');
     } else {
-      const hf = fd.flatRate && parseFloat(fd.flatRate) > 0;
-      const hc = fd.hasCode && fd.codeAmount;
-      const hp = fd.hasPresentation && fd.slideCount;
+      const hf = toNum(fd.flatRate) > 0;
+      const hc = fd.hasCode && fd.codeAmount.trim() !== '';
+      const hp = fd.hasPresentation && fd.slideCount.trim() !== '';
       if (!hf && !hc && !hp) errs.push('Enter flat rate, code amount, or slide count');
     }
-    if (fd.hasCode && (!fd.codeAmount || parseFloat(fd.codeAmount) < 0)) errs.push('Valid code amount required');
-    if (fd.hasPresentation && (!fd.slideCount || parseFloat(fd.slideCount) < 0)) errs.push('Valid slide count required');
-    if (fd.paymentStatus === 'partial' && (!fd.amountPaid || parseFloat(fd.amountPaid) <= 0)) errs.push('Amount paid required for partial payment');
-    if (fd.amountPaid && parseFloat(fd.amountPaid) > parseFloat(calcAmount())) errs.push('Amount paid exceeds total');
+    if (fd.hasCode && toNum(fd.codeAmount) < 0) errs.push('Valid code amount required');
+    if (fd.hasPresentation && toNum(fd.slideCount) < 0) errs.push('Valid slide count required');
+    if (fd.paymentStatus === 'partial' && toNum(fd.amountPaid) <= 0) errs.push('Amount paid required for partial payment');
+    if (fd.amountPaid && toNum(fd.amountPaid) > parseFloat(calcAmount())) errs.push('Amount paid exceeds total');
     return errs;
   };
 
@@ -223,14 +253,14 @@ function ProjectForm() {
         orderRefCode: fd.orderRefCode, orderType: fd.orderType, topic: fd.topic,
         status: fd.status, priority: fd.priority, notes: fd.notes,
         paymentStatus: fd.paymentStatus, pricingMode,
-        words: pricingMode === 'word_count' && parseFloat(fd.words) > 0 ? Math.round(parseFloat(fd.words)) : 0,
-        cpp: pricingMode === 'word_count' && parseFloat(fd.cpp) > 0 ? parseFloat(fd.cpp) : 0,
-        flatRate: pricingMode === 'flat_rate' && parseFloat(fd.flatRate) > 0 ? parseFloat(fd.flatRate) : 0,
+        words: pricingMode === 'word_count' && toNum(fd.words) > 0 ? Math.round(toNum(fd.words)) : 0,
+        cpp: pricingMode === 'word_count' && toNum(fd.cpp) > 0 ? toNum(fd.cpp) : 0,
+        flatRate: pricingMode === 'flat_rate' && toNum(fd.flatRate) > 0 ? toNum(fd.flatRate) : 0,
         hasCode: Boolean(fd.hasCode),
-        codeAmount: fd.hasCode && parseFloat(fd.codeAmount) > 0 ? parseFloat(fd.codeAmount) : 0,
+        codeAmount: fd.hasCode && toNum(fd.codeAmount) > 0 ? toNum(fd.codeAmount) : 0,
         hasPresentation: Boolean(fd.hasPresentation),
-        slideCount: fd.hasPresentation && parseFloat(fd.slideCount) > 0 ? Math.round(parseFloat(fd.slideCount)) : 0,
-        amountPaid: fd.paymentStatus === 'partial' && parseFloat(fd.amountPaid) > 0 ? parseFloat(fd.amountPaid) : 0,
+        slideCount: fd.hasPresentation && toNum(fd.slideCount) > 0 ? Math.round(toNum(fd.slideCount)) : 0,
+        amountPaid: fd.paymentStatus === 'partial' && toNum(fd.amountPaid) > 0 ? toNum(fd.amountPaid) : 0,
         amount: parseFloat(calcAmount()),
         balance: fd.paymentStatus === 'partial' ? parseFloat(calcBalance()) : 0,
         lastUpdated: new Date().toISOString(),
@@ -251,31 +281,24 @@ function ProjectForm() {
   if (isLoading) return (
     <div style={{ minHeight: '100vh', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.75rem' }}>
       <div className="spinner-border text-primary" role="status" style={{ width: '2rem', height: '2rem' }}>
-        <span className="visually-hidden">Loading...</span>
+        <span className="visually-hidden">Loading…</span>
       </div>
       <p style={{ fontFamily: MONO, fontSize: '0.75rem', color: '#6c757d', margin: 0 }}>Loading…</p>
     </div>
   );
 
   const writingCost = pricingMode === 'word_count'
-    ? ((parseFloat(fd.words) || 0) / 275) * (parseFloat(fd.cpp) || 0)
-    : (parseFloat(fd.flatRate) || 0);
+    ? (toNum(fd.words) / 275) * toNum(fd.cpp)
+    : toNum(fd.flatRate);
   const totalAmt = parseFloat(calcAmount());
   const hasBreakdown =
-    (pricingMode === 'word_count' && (parseFloat(fd.words) || 0) > 0) ||
-    (pricingMode === 'flat_rate' && (parseFloat(fd.flatRate) || 0) > 0) ||
-    (fd.hasCode && (parseFloat(fd.codeAmount) || 0) > 0) ||
-    (fd.hasPresentation && (parseFloat(fd.slideCount) || 0) > 0);
+    (pricingMode === 'word_count' && toNum(fd.words) > 0) ||
+    (pricingMode === 'flat_rate' && toNum(fd.flatRate) > 0) ||
+    (fd.hasCode && toNum(fd.codeAmount) > 0) ||
+    (fd.hasPresentation && toNum(fd.slideCount) > 0);
 
   const priColors = { low: '#198754', medium: '#fd7e14', high: '#dc3545', urgent: '#9b0000' };
   const priColor = priColors[fd.priority] || '#6c757d';
-
-  const G2 = ({ children, style }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', ...style }}>{children}</div>
-  );
-  const G3 = ({ children }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>{children}</div>
-  );
 
   return (
     <>
@@ -283,10 +306,11 @@ function ProjectForm() {
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
-        input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        /* ✅ FIX: Removed webkit-spin-button suppression — it was interfering with number inputs on some browsers.
+           Using type="text" + inputmode for integer fields instead. */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .pf-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
         @media (max-width: 860px) { .pf-layout { grid-template-columns: 1fr; } }
       `}</style>
@@ -296,27 +320,22 @@ function ProjectForm() {
           <form onSubmit={handleSubmit} noValidate>
             <div className="pf-layout">
 
-              {/* ── LEFT: main card ── */}
+              {/*  LEFT  */}
               <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-
-                {/* Card header */}
                 <div style={{ background: '#0d6efd', padding: '0.85rem 1.25rem' }}>
                   <h2 style={{ fontFamily: MONO, fontSize: '1.15rem', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
                     {id ? 'Edit Project' : 'Create New Project'}
                   </h2>
                 </div>
 
-                {/* Card body */}
                 <div style={{ padding: '1.25rem' }}>
 
-                  {/* Error */}
                   {error && (
                     <div style={{ fontFamily: MONO, fontSize: '0.8rem', background: '#f8d7da', border: '1px solid #f5c2c7', borderRadius: '4px', color: '#842029', padding: '0.6rem 0.85rem', marginBottom: '1rem', display: 'flex', gap: '0.45rem', animation: 'slideIn 0.2s ease' }}>
                       <span>⚠</span><span>{error}</span>
                     </div>
                   )}
 
-                  {/* ── Basic Information ── */}
                   <SectionLabel>Basic Information</SectionLabel>
                   <G3>
                     <div>
@@ -359,10 +378,8 @@ function ProjectForm() {
 
                   <Divider />
 
-                  {/* ── Pricing ── */}
                   <SectionLabel>Pricing Details</SectionLabel>
 
-                  {/* Mode toggle */}
                   <div style={{ display: 'inline-flex', border: '1px solid #dee2e6', borderRadius: '6px', padding: '3px', gap: '2px', marginBottom: '0.85rem', background: '#f8f9fa' }}>
                     {[['word_count', '📄 Word Count'], ['flat_rate', '💰 Flat Rate']].map(([mode, label]) => (
                       <button key={mode} type="button" onClick={() => handleModeChange(mode)}
@@ -381,18 +398,32 @@ function ProjectForm() {
                     <G2>
                       <div>
                         <FL>Word Count</FL>
-                        <FI type="number" name="words" value={fd.words} onChange={handleChange} min="0" step="1" placeholder="e.g. 3000" />
+                        {/* ✅ FIX: type="text" + inputMode="numeric" so the full number can be typed/pasted freely */}
+                        <FI
+                          type="text"
+                          inputMode="numeric"
+                          name="words"
+                          value={fd.words}
+                          onChange={handleChange}
+                          placeholder="e.g. 3000"
+                        />
                       </div>
                       <div>
                         <FL>Cost Per Page (CPP)</FL>
-                        <FS name="cpp" value={fd.cpp} onChange={handleChange} disabled={!(parseFloat(fd.words) > 0)} style={{ opacity: parseFloat(fd.words) > 0 ? 1 : 0.55, background: parseFloat(fd.words) > 0 ? '#fff' : '#f8f9fa' }}>
+                        <FS
+                          name="cpp"
+                          value={fd.cpp}
+                          onChange={handleChange}
+                          disabled={toNum(fd.words) <= 0}
+                          style={{ opacity: toNum(fd.words) > 0 ? 1 : 0.55, background: toNum(fd.words) > 0 ? '#fff' : '#f8f9fa' }}
+                        >
                           <option value="">Select CPP</option>
                           <option value="350">Ksh. 350</option>
                           <option value="400">Ksh. 400</option>
                         </FS>
-                        {parseFloat(fd.words) > 0 && parseFloat(fd.cpp) > 0 && (
+                        {toNum(fd.words) > 0 && toNum(fd.cpp) > 0 && (
                           <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: '#6c757d', margin: '0.25rem 0 0' }}>
-                            {fd.words} ÷ 275 × {fd.cpp} = Ksh.{((parseFloat(fd.words) / 275) * parseFloat(fd.cpp)).toFixed(2)}
+                            {fd.words} ÷ 275 × {fd.cpp} = Ksh.{((toNum(fd.words) / 275) * toNum(fd.cpp)).toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -404,7 +435,7 @@ function ProjectForm() {
                       <FL>Agreed Amount</FL>
                       <div style={{ display: 'flex' }}>
                         <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.65rem', background: '#e9ecef', border: '1px solid #ced4da', borderRight: 'none', borderRadius: '4px 0 0 4px', fontFamily: MONO, fontSize: '0.78rem', color: '#495057', flexShrink: 0 }}>Ksh.</span>
-                        <FI type="number" name="flatRate" value={fd.flatRate} onChange={handleChange} min="0" step="0.01" placeholder="0.00" style={{ borderRadius: '0 4px 4px 0' }} />
+                        <FI type="text" inputMode="decimal" name="flatRate" value={fd.flatRate} onChange={handleChange} placeholder="0.00" style={{ borderRadius: '0 4px 4px 0' }} />
                       </div>
                     </div>
                   )}
@@ -412,21 +443,23 @@ function ProjectForm() {
                   {/* Add-ons */}
                   <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                     <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.75rem' }}>
-                      <Toggle id="hasCode" checked={fd.hasCode} onChange={handleChange} label="Project includes code" />
+                      {/* ✅ FIX: name prop passed to Toggle so handleChange can identify the field */}
+                      <Toggle id="hasCode" name="hasCode" checked={fd.hasCode} onChange={handleChange} label="Project includes code" />
                       {fd.hasCode && (
                         <div style={{ marginTop: '0.6rem', animation: 'slideIn 0.15s ease' }}>
                           <FL>Code Amount (Ksh.)</FL>
-                          <FI type="number" name="codeAmount" value={fd.codeAmount} onChange={handleChange} min="0" step="0.01" placeholder="0.00" />
+                          <FI type="text" inputMode="decimal" name="codeAmount" value={fd.codeAmount} onChange={handleChange} placeholder="0.00" />
                         </div>
                       )}
                     </div>
                     <div style={{ background: '#f8f9fa', border: '1px solid #dee2e6', borderRadius: '6px', padding: '0.75rem' }}>
-                      <Toggle id="hasPresentation" checked={fd.hasPresentation} onChange={handleChange} label="Includes presentation" />
+                      {/* ✅ FIX: name prop passed to Toggle */}
+                      <Toggle id="hasPresentation" name="hasPresentation" checked={fd.hasPresentation} onChange={handleChange} label="Includes presentation" />
                       {fd.hasPresentation && (
                         <div style={{ marginTop: '0.6rem', animation: 'slideIn 0.15s ease' }}>
                           <FL>Slide Count</FL>
-                          <FI type="number" name="slideCount" value={fd.slideCount} onChange={handleChange} min="0" step="1" placeholder="0" />
-                          {(parseFloat(fd.slideCount) || 0) > 0 && (
+                          <FI type="text" inputMode="numeric" name="slideCount" value={fd.slideCount} onChange={handleChange} placeholder="0" />
+                          {toNum(fd.slideCount) > 0 && (
                             <p style={{ fontFamily: MONO, fontSize: '0.68rem', color: '#6c757d', margin: '0.25rem 0 0' }}>
                               Ksh.{calcPPT().toFixed(2)} (@ Ksh.400 / 3 slides)
                             </p>
@@ -438,7 +471,6 @@ function ProjectForm() {
 
                   <Divider />
 
-                  {/* ── Payment & Status (side by side) ── */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
                     <div>
                       <SectionLabel>Payment Information</SectionLabel>
@@ -453,7 +485,7 @@ function ProjectForm() {
                       {fd.paymentStatus === 'partial' && (
                         <div style={{ marginTop: '0.65rem', animation: 'slideIn 0.15s ease' }}>
                           <FL>Amount Paid (Ksh.)</FL>
-                          <FI type="number" name="amountPaid" value={fd.amountPaid} onChange={handleChange} min="0" step="0.01" placeholder="0.00" />
+                          <FI type="text" inputMode="decimal" name="amountPaid" value={fd.amountPaid} onChange={handleChange} placeholder="0.00" />
                         </div>
                       )}
                     </div>
@@ -473,17 +505,15 @@ function ProjectForm() {
 
                   <Divider />
 
-                  {/* ── Notes ── */}
                   <SectionLabel>Notes</SectionLabel>
                   <FTA name="notes" value={fd.notes} onChange={handleChange} rows={3} placeholder="Additional notes, instructions, or comments…" />
 
                 </div>
               </div>
 
-              {/* ── RIGHT: sticky sidebar ── */}
+              {/*  RIGHT sidebar  */}
               <div style={{ position: 'sticky', top: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
-                {/* Cost Summary card */}
                 <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
                   <div style={{ background: '#f8f9fa', borderBottom: '1px solid #dee2e6', padding: '0.6rem 1rem' }}>
                     <span style={{ fontFamily: MONO, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#495057' }}>Cost Breakdown</span>
@@ -491,7 +521,7 @@ function ProjectForm() {
                   <div style={{ padding: '0.85rem 1rem' }}>
                     {hasBreakdown ? (
                       <>
-                        {pricingMode === 'word_count' && (parseFloat(fd.words) || 0) > 0 && (
+                        {pricingMode === 'word_count' && toNum(fd.words) > 0 && (
                           <>
                             <BRow label="Writing Cost" value={`Ksh.${writingCost.toFixed(2)}`} />
                             <p style={{ fontFamily: MONO, fontSize: '0.65rem', color: '#adb5bd', margin: '0 0 0.3rem 0' }}>
@@ -499,13 +529,13 @@ function ProjectForm() {
                             </p>
                           </>
                         )}
-                        {pricingMode === 'flat_rate' && (parseFloat(fd.flatRate) || 0) > 0 && (
+                        {pricingMode === 'flat_rate' && toNum(fd.flatRate) > 0 && (
                           <BRow label="Flat Rate" value={`Ksh.${writingCost.toFixed(2)}`} />
                         )}
-                        {fd.hasCode && (parseFloat(fd.codeAmount) || 0) > 0 && (
-                          <BRow label="Code" value={`Ksh.${parseFloat(fd.codeAmount || 0).toFixed(2)}`} />
+                        {fd.hasCode && toNum(fd.codeAmount) > 0 && (
+                          <BRow label="Code" value={`Ksh.${toNum(fd.codeAmount).toFixed(2)}`} />
                         )}
-                        {fd.hasPresentation && (parseFloat(fd.slideCount) || 0) > 0 && (
+                        {fd.hasPresentation && toNum(fd.slideCount) > 0 && (
                           <>
                             <BRow label="Presentation" value={`Ksh.${calcPPT().toFixed(2)}`} />
                             <p style={{ fontFamily: MONO, fontSize: '0.65rem', color: '#adb5bd', margin: '0 0 0.3rem 0' }}>
@@ -517,10 +547,10 @@ function ProjectForm() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: MONO, fontSize: '0.95rem', fontWeight: 800, color: '#212529' }}>
                           <span>Total</span><span>Ksh.{calcAmount()}</span>
                         </div>
-                        {fd.paymentStatus === 'partial' && (parseFloat(fd.amountPaid) || 0) > 0 && (
+                        {fd.paymentStatus === 'partial' && toNum(fd.amountPaid) > 0 && (
                           <>
                             <div style={{ borderTop: '1px dashed #dee2e6', margin: '0.5rem 0' }} />
-                            <BRow label="Paid" value={`Ksh.${parseFloat(fd.amountPaid).toFixed(2)}`} color="#198754" />
+                            <BRow label="Paid" value={`Ksh.${toNum(fd.amountPaid).toFixed(2)}`} color="#198754" />
                             <BRow label="Balance" value={`Ksh.${calcBalance()}`} color="#dc3545" bold />
                           </>
                         )}
@@ -550,7 +580,6 @@ function ProjectForm() {
                   </div>
                 </div>
 
-                {/* Priority indicator */}
                 {fd.priority && (
                   <div style={{ background: '#fff', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.3)', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: priColor, flexShrink: 0 }} />
@@ -560,7 +589,6 @@ function ProjectForm() {
                   </div>
                 )}
 
-                {/* Action buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <button type="submit" disabled={isLoading}
                     style={{ fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.04em', background: isLoading ? '#6ea8fe' : '#0d6efd', border: 'none', borderRadius: '4px', color: '#fff', padding: '0.6rem 1rem', cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
@@ -584,7 +612,6 @@ function ProjectForm() {
           </form>
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   );
 }

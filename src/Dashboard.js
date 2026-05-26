@@ -15,10 +15,10 @@ import {
 import { motion } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 
-// ── Font constant (matches ProjectForm.js) ────────────────────────────────────
+//  Font constant (matches ProjectForm.js) 
 const MONO = "'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace";
 
-// ── Particles: generated once at module level to prevent re-render jitter ─────
+//  Particles: generated once at module level to prevent re-render jitter ─
 const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   id: i,
   left: `${Math.random() * 100}%`,
@@ -26,7 +26,7 @@ const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   duration: `${(Math.random() * 10 + 5).toFixed(2)}s`
 }));
 
-// ── Initial stats shape (single source of truth) ──────────────────────────────
+//  Initial stats shape (single source of truth) 
 const initialStatsShape = {
   totalProjects: 0,
   completed: 0,
@@ -42,7 +42,7 @@ const initialStatsShape = {
   unpaidCount: 0
 };
 
-// ── Themes ────────────────────────────────────────────────────────────────────
+//  Themes 
 const lightTheme = {
   background: '#f8f9fa',
   cardBackground: '#ffffff',
@@ -82,7 +82,7 @@ const vibrantTheme = {
   gradient: 'linear-gradient(135deg, #f6e05e, #ed64a6)'
 };
 
-// ── Styled Components ─────────────────────────────────────────────────────────
+//  Styled Components ─
 const DashboardContainer = styled(motion.div)`
   background: ${props => props.theme.background};
   color: ${props => props.theme.text};
@@ -161,7 +161,7 @@ const PercentageChange = styled.span`
     '#a0aec0'};
 `;
 
-// ── Dashboard Component ───────────────────────────────────────────────────────
+//  Dashboard Component ─
 function Dashboard() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -179,7 +179,7 @@ function Dashboard() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const COLORS = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#9f7aea', '#ed64a6'];
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  //  Helpers 
   const calculatePercentageChange = (current, previous) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
@@ -217,7 +217,7 @@ function Dashboard() {
     );
   };
 
-  // ── Stats calculation ─────────────────────────────────────────────────────
+  //  Stats calculation ─
   const calcStats = (projectsList, currentDate) =>
     projectsList.reduce((acc, project) => {
       acc.totalProjects += 1;
@@ -304,7 +304,7 @@ function Dashboard() {
     else setTheme(lightTheme);
   };
 
-  // ── Derived chart data ────────────────────────────────────────────────────
+  //  Derived chart data 
   const currentDate = new Date();
 
   const projectTrendsMap = projects.reduce((acc, project) => {
@@ -537,7 +537,7 @@ function Dashboard() {
             {theme === lightTheme ? <FaSun /> : theme === darkTheme ? <FaMoon /> : <FaPalette />}
           </ThemeToggle>
 
-          {/* ── Header ── */}
+          {/*  Header  */}
           <div className="d-flex justify-content-between align-items-center mb-4">
             <motion.h1
               className="d-flex align-items-center mb-0"
@@ -559,7 +559,7 @@ function Dashboard() {
             </motion.button>
           </div>
 
-          {/* ── Filters ── */}
+          {/*  Filters  */}
           <Card className="mb-4" style={{ padding: 0, overflow: 'hidden' }}>
             <GradientHeader>
               <h5 className="mb-0" style={{ fontFamily: MONO, fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -623,7 +623,7 @@ function Dashboard() {
             </motion.div>
           )}
 
-          {/* ── Row 1: Status Metric Cards (6) ── */}
+          {/*  Row 1: Status Metric Cards (6)  */}
           <div className="row mb-3">
             {[
               { icon: FaFolder,              title: 'Total Projects', value: stats.totalProjects, compare: compareStats?.totalProjects, color: theme.primary },
@@ -655,7 +655,7 @@ function Dashboard() {
             ))}
           </div>
 
-          {/* ── Row 2: Financial Metric Cards (4) ── */}
+          {/*  Row 2: Financial Metric Cards (4)  */}
           <div className="row mb-4">
             {[
               {
@@ -717,7 +717,7 @@ function Dashboard() {
             ))}
           </div>
 
-          {/* ── Row 3: Status Distribution + Monthly Revenue ── */}
+          {/*  Row 3: Status Distribution + Monthly Revenue  */}
           <div className="row">
             {/* Status Distribution */}
             <div className="col-md-6 mb-4">
@@ -830,7 +830,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* ── Row 4: Recent Projects + Payment Breakdown ── */}
+          {/*  Row 4: Recent Projects + Payment Breakdown  */}
           <div className="row">
             {/* Recent Projects */}
             <div className="col-md-8 mb-4">
@@ -960,7 +960,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* ── Row 5: Project Trends + Type Trend ── */}
+          {/*  Row 5: Project Trends + Type Trend  */}
           <div className="row">
             <div className="col-md-8 mb-4">
               <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -1038,7 +1038,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* ── Particles ── */}
+          {/*  Particles  */}
           {PARTICLES.map(({ id, left, top, duration }) => (
             <div
               key={id}
