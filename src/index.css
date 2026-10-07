@@ -1,0 +1,8 @@
+/* Global design tokens and component theming live in App.css (loaded after Bootstrap). */
+body {
+  margin: 0;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}

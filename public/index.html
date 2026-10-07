@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0e1424" />
+    <meta
+      name="description"
+      content="Projects Recording App: track orders, payments and deadlines in one place."
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>Projects Recording App</title>
+    <script>
+      /* Apply the saved theme before first paint to avoid a light/dark flash */
+      (function () {
+        var d = document.documentElement;
+        var t = 'dark';
+        try {
+          var s = window.localStorage.getItem('appTheme');
+          if (s === 'light' || s === 'vibrant' || s === 'dark') t = s;
+        } catch (e) {}
+        d.setAttribute('data-app-theme', t);
+        d.setAttribute('data-bs-theme', t === 'dark' ? 'dark' : 'light');
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
